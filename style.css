@@ -26,7 +26,8 @@ body {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
@@ -189,6 +190,7 @@ main {
 
 .body-card,
 .filter-box,
+.exercise-form,
 .workout-panel,
 .session-card,
 .stat-card {
@@ -200,8 +202,58 @@ main {
 
 .body-card,
 .filter-box,
+.exercise-form,
 .workout-panel {
   padding: 16px;
+}
+
+.exercise-form {
+  margin-top: 16px;
+}
+
+.form-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.form-heading h3 {
+  margin-bottom: 0;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.form-grid label {
+  display: grid;
+  gap: 6px;
+}
+
+.form-grid span {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.form-grid input,
+.form-grid select {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #111615;
+  color: var(--text);
+  padding: 8px 10px;
+}
+
+.wide-field {
+  grid-column: span 2;
 }
 
 .exercise-list {
@@ -263,7 +315,7 @@ td small,
 
 table {
   width: 100%;
-  min-width: 720px;
+  min-width: 840px;
   border-collapse: collapse;
   background: var(--panel);
 }
@@ -290,6 +342,17 @@ th {
   background: #111615;
   color: var(--text);
   padding: 8px;
+}
+
+.row-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.small-btn {
+  min-height: 36px;
+  padding: 7px 10px;
+  white-space: nowrap;
 }
 
 .row-check {
@@ -495,8 +558,17 @@ th {
   .workout-state,
   .active-timers,
   .weekly-grid,
+  .form-grid,
   .big-actions {
     grid-template-columns: 1fr;
+  }
+
+  .form-heading {
+    flex-direction: column;
+  }
+
+  .wide-field {
+    grid-column: auto;
   }
 
   .timer-display {

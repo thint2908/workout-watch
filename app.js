@@ -7,6 +7,7 @@
     sessions: [],
     selectedBodyParts: [],
     builder: {},
+    editingExerciseId: null,
     activeWorkout: null,
     activeTab: "library",
     tickId: null
@@ -46,6 +47,18 @@
     els.libraryGrid = document.getElementById("libraryGrid");
     els.bodyPartFilters = document.getElementById("bodyPartFilters");
     els.builderRows = document.getElementById("builderRows");
+    els.exerciseForm = document.getElementById("exerciseForm");
+    els.exerciseFormTitle = document.getElementById("exerciseFormTitle");
+    els.exerciseNameInput = document.getElementById("exerciseNameInput");
+    els.exerciseBodyPartInput = document.getElementById("exerciseBodyPartInput");
+    els.exerciseTypeInput = document.getElementById("exerciseTypeInput");
+    els.exerciseSetsInput = document.getElementById("exerciseSetsInput");
+    els.exerciseTargetInput = document.getElementById("exerciseTargetInput");
+    els.exerciseRestInput = document.getElementById("exerciseRestInput");
+    els.exerciseDifficultyInput = document.getElementById("exerciseDifficultyInput");
+    els.exerciseNoteInput = document.getElementById("exerciseNoteInput");
+    els.saveExerciseBtn = document.getElementById("saveExerciseBtn");
+    els.cancelEditBtn = document.getElementById("cancelEditBtn");
     els.startWorkoutBtn = document.getElementById("startWorkoutBtn");
     els.playerTitle = document.getElementById("playerTitle");
     els.elapsedTime = document.getElementById("elapsedTime");
@@ -79,6 +92,8 @@
     });
 
     els.startWorkoutBtn.addEventListener("click", startWorkout);
+    els.exerciseForm.addEventListener("submit", saveExerciseFromForm);
+    els.cancelEditBtn.addEventListener("click", resetExerciseForm);
     els.startSetBtn.addEventListener("click", startSet);
     els.finishSetBtn.addEventListener("click", finishSet);
     els.skipRestBtn.addEventListener("click", skipRest);
@@ -118,10 +133,10 @@
   function seedBuilderDefaults() {
     state.exercises.forEach(function (exercise) {
       state.builder[exercise.id] = {
-        selected: false,
-        sets: exercise.defaultSets,
-        target: exercise.defaultReps,
-        restSeconds: suggestedRest(exercise)
+        selected: state.builder[exercise.id] ? state.builder[exercise.id].selected : false,
+        sets: state.builder[exercise.id] ? state.builder[exercise.id].sets : exercise.defaultSets,
+        target: state.builder[exercise.id] ? state.builder[exercise.id].target : exercise.defaultReps,
+        restSeconds: state.builder[exercise.id] ? state.builder[exercise.id].restSeconds : suggestedRest(exercise)
       };
     });
   }
@@ -144,10 +159,21 @@
   function renderAll() {
     renderLibrary();
     renderFilters();
+    renderExerciseFormOptions();
     renderBuilder();
     renderPlayer();
     renderLog();
     renderStats();
+  }
+
+  function renderExerciseFormOptions() {
+    els.exerciseBodyPartInput.innerHTML = "";
+    WorkoutSeed.bodyParts.forEach(function (bodyPart) {
+      var option = document.createElement("option");
+      option.value = bodyPart;
+      option.textContent = bodyPart;
+      els.exerciseBodyPartInput.appendChild(option);
+    });
   }
 
   function switchTab(tabName) {
@@ -215,6 +241,14 @@
   function renderBuilder() {
     els.builderRows.innerHTML = "";
     filteredExercises().forEach(function (exercise) {
+      if (!state.builder[exercise.id]) {
+        state.builder[exercise.id] = {
+          selected: false,
+          sets: exercise.defaultSets,
+          target: exercise.defaultReps,
+          restSeconds: suggestedRest(exercise)
+        };
+      }
       var config = state.builder[exercise.id];
       var row = document.createElement("tr");
       row.innerHTML =
@@ -223,9 +257,11 @@
         "<td>" + escapeHtml(exercise.bodyPart) + "</td>" +
         '<td><input class="number-input" min="1" max="12" type="number" value="' + config.sets + '"></td>' +
         '<td><input class="number-input" min="1" max="300" type="number" value="' + config.target + '"></td>' +
-        '<td><input class="number-input" min="15" max="180" step="5" type="number" value="' + config.restSeconds + '"></td>';
+        '<td><input class="number-input" min="15" max="180" step="5" type="number" value="' + config.restSeconds + '"></td>' +
+        '<td><div class="row-actions"><button class="ghost-btn small-btn" type="button">Edit</button><button class="danger-btn small-btn" type="button">Remove</button></div></td>';
 
       var inputs = row.querySelectorAll("input");
+      var buttons = row.querySelectorAll("button");
       inputs[0].addEventListener("change", function (event) {
         config.selected = event.target.checked;
       });
@@ -238,8 +274,136 @@
       inputs[3].addEventListener("input", function (event) {
         config.restSeconds = cleanNumber(event.target.value, 15);
       });
+      buttons[0].addEventListener("click", function () {
+        editExercise(exercise.id);
+      });
+      buttons[1].addEventListener("click", function () {
+        removeExercise(exercise.id);
+      });
 
       els.builderRows.appendChild(row);
+    });
+  }
+
+  function exerciseFromForm() {
+    var type = els.exerciseTypeInput.value;
+    var target = cleanNumber(els.exerciseTargetInput.value, type === "time" ? 30 : 8);
+    return {
+      name: els.exerciseNameInput.value.trim(),
+      bodyPart: els.exerciseBodyPartInput.value,
+      type: type,
+      defaultSets: cleanNumber(els.exerciseSetsInput.value, 3),
+      defaultReps: target,
+      defaultRestSeconds: cleanNumber(els.exerciseRestInput.value, 60),
+      difficulty: els.exerciseDifficultyInput.value,
+      note: els.exerciseNoteInput.value.trim()
+    };
+  }
+
+  function saveExerciseFromForm(event) {
+    event.preventDefault();
+    var exercise = exerciseFromForm();
+    if (!exercise.name) {
+      showToast("Exercise name is required.");
+      return;
+    }
+
+    els.saveExerciseBtn.disabled = true;
+    var wasEditing = Boolean(state.editingExerciseId);
+    var editingId = state.editingExerciseId;
+    var save = wasEditing ?
+      WorkoutDb.updateExercise(state.editingExerciseId, exercise) :
+      WorkoutDb.createExercise(exercise);
+
+    save.then(function (saved) {
+      if (wasEditing) {
+        state.exercises = state.exercises.map(function (item) {
+          return item.id === editingId ? saved : item;
+        });
+      } else {
+        state.exercises.push(saved);
+        if (state.selectedBodyParts.indexOf(saved.bodyPart) < 0) {
+          state.selectedBodyParts.push(saved.bodyPart);
+        }
+      }
+      state.builder[saved.id] = {
+        selected: state.builder[saved.id] ? state.builder[saved.id].selected : false,
+        sets: saved.defaultSets,
+        target: saved.defaultReps,
+        restSeconds: suggestedRest(saved)
+      };
+      resetExerciseForm();
+      renderAll();
+      updateModeWarning();
+      showToast(wasEditing ? "Exercise updated." : "Exercise added.");
+    }).catch(function () {
+      showToast("Exercise save failed.");
+      updateModeWarning();
+    }).finally(function () {
+      els.saveExerciseBtn.disabled = false;
+    });
+  }
+
+  function editExercise(exerciseId) {
+    var exercise = state.exercises.find(function (item) {
+      return item.id === exerciseId;
+    });
+    if (!exercise) {
+      return;
+    }
+
+    state.editingExerciseId = exerciseId;
+    els.exerciseFormTitle.textContent = "Edit exercise";
+    els.saveExerciseBtn.textContent = "Save Changes";
+    els.cancelEditBtn.hidden = false;
+    els.exerciseNameInput.value = exercise.name;
+    els.exerciseBodyPartInput.value = exercise.bodyPart;
+    els.exerciseTypeInput.value = exercise.type;
+    els.exerciseSetsInput.value = exercise.defaultSets;
+    els.exerciseTargetInput.value = exercise.defaultReps;
+    els.exerciseRestInput.value = exercise.defaultRestSeconds;
+    els.exerciseDifficultyInput.value = exercise.difficulty || "normal";
+    els.exerciseNoteInput.value = exercise.note || "";
+    els.exerciseNameInput.focus();
+  }
+
+  function resetExerciseForm() {
+    state.editingExerciseId = null;
+    els.exerciseForm.reset();
+    els.exerciseFormTitle.textContent = "Add exercise";
+    els.saveExerciseBtn.textContent = "Add Exercise";
+    els.cancelEditBtn.hidden = true;
+    els.exerciseSetsInput.value = 3;
+    els.exerciseTargetInput.value = 8;
+    els.exerciseRestInput.value = 60;
+    els.exerciseDifficultyInput.value = "normal";
+  }
+
+  function removeExercise(exerciseId) {
+    var exercise = state.exercises.find(function (item) {
+      return item.id === exerciseId;
+    });
+    if (!exercise) {
+      return;
+    }
+    if (!window.confirm("Remove " + exercise.name + " from the exercise list? Workout logs will keep the exercise name.")) {
+      return;
+    }
+
+    WorkoutDb.deleteExercise(exerciseId).then(function () {
+      state.exercises = state.exercises.filter(function (item) {
+        return item.id !== exerciseId;
+      });
+      delete state.builder[exerciseId];
+      if (state.editingExerciseId === exerciseId) {
+        resetExerciseForm();
+      }
+      renderAll();
+      updateModeWarning();
+      showToast("Exercise removed.");
+    }).catch(function () {
+      showToast("Exercise remove failed.");
+      updateModeWarning();
     });
   }
 

@@ -92,6 +92,20 @@
     };
   }
 
+  function exerciseToDb(exercise) {
+    return {
+      name: exercise.name,
+      body_part: exercise.bodyPart,
+      type: exercise.type,
+      default_sets: exercise.defaultSets,
+      default_reps: exercise.type === "reps" ? exercise.defaultReps : null,
+      default_seconds: exercise.type === "time" ? exercise.defaultReps : null,
+      default_rest_seconds: exercise.defaultRestSeconds,
+      difficulty: exercise.difficulty || "normal",
+      note: exercise.note || ""
+    };
+  }
+
   function dbToExercise(row) {
     return {
       id: row.id,
@@ -192,6 +206,68 @@
       return rows.map(dbToExercise);
     }).catch(function () {
       return localExercises();
+    });
+  }
+
+  function createExercise(exercise) {
+    return request("exercises", {
+      method: "POST",
+      headers: headers({ Prefer: "return=representation" }),
+      body: JSON.stringify(exerciseToDb(exercise))
+    }).then(function (rows) {
+      var saved = dbToExercise(rows[0]);
+      var exercises = localGet("exercises", []);
+      exercises.push(saved);
+      localSet("exercises", exercises);
+      return saved;
+    }).catch(function () {
+      var exercises = localGet("exercises", []);
+      var saved = Object.assign({}, exercise, { id: localId("exercise") });
+      exercises.push(saved);
+      localSet("exercises", exercises);
+      return saved;
+    });
+  }
+
+  function updateExercise(exerciseId, exercise) {
+    return request("exercises?id=eq." + encodeURIComponent(exerciseId), {
+      method: "PATCH",
+      headers: headers({ Prefer: "return=representation" }),
+      body: JSON.stringify(exerciseToDb(exercise))
+    }).then(function (rows) {
+      var saved = dbToExercise(rows[0]);
+      var exercises = localGet("exercises", []);
+      localSet("exercises", exercises.map(function (item) {
+        return item.id === exerciseId ? saved : item;
+      }));
+      return saved;
+    }).catch(function () {
+      var exercises = localGet("exercises", []);
+      var saved = Object.assign({}, exercise, { id: exerciseId });
+      localSet("exercises", exercises.map(function (item) {
+        return item.id === exerciseId ? saved : item;
+      }));
+      return saved;
+    });
+  }
+
+  function deleteExercise(exerciseId) {
+    return request("workout_sets?exercise_id=eq." + encodeURIComponent(exerciseId), {
+      method: "PATCH",
+      headers: headers({ Prefer: "return=minimal" }),
+      body: JSON.stringify({ exercise_id: null })
+    }).then(function () {
+      return request("exercises?id=eq." + encodeURIComponent(exerciseId), { method: "DELETE" });
+    }).then(function () {
+      var exercises = localGet("exercises", []);
+      localSet("exercises", exercises.filter(function (item) {
+        return item.id !== exerciseId;
+      }));
+    }).catch(function () {
+      var exercises = localGet("exercises", []);
+      localSet("exercises", exercises.filter(function (item) {
+        return item.id !== exerciseId;
+      }));
     });
   }
 
@@ -340,6 +416,9 @@
   window.WorkoutDb = {
     listExercises: listExercises,
     seedExercises: seedExercises,
+    createExercise: createExercise,
+    updateExercise: updateExercise,
+    deleteExercise: deleteExercise,
     createSession: createSession,
     saveSet: saveSet,
     updateSetRest: updateSetRest,
