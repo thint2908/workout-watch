@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Workout Watch</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <header class="app-header">
+      <div>
+        <p class="eyebrow">Local calisthenics tracker</p>
+        <h1>Workout Watch</h1>
+        <p class="mode-warning" id="modeWarning" hidden>Offline/local mode</p>
+      </div>
+      <div class="header-actions">
+        <button class="ghost-btn" id="exportBtn" type="button">Export JSON</button>
+        <label class="ghost-btn import-label" for="importFile">Import JSON</label>
+        <input id="importFile" type="file" accept="application/json">
+        <button class="danger-btn" id="resetBtn" type="button">Reset demo data</button>
+      </div>
+    </header>
+
+    <nav class="tabs" aria-label="App sections">
+      <button class="tab-btn active" data-tab="library" type="button">Library</button>
+      <button class="tab-btn" data-tab="builder" type="button">Builder</button>
+      <button class="tab-btn" data-tab="player" type="button">Timer</button>
+      <button class="tab-btn" data-tab="log" type="button">Log</button>
+      <button class="tab-btn" data-tab="stats" type="button">Stats</button>
+    </nav>
+
+    <main>
+      <section class="panel active" id="libraryPanel">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Exercise Library</p>
+            <h2>Beginner home calisthenics</h2>
+          </div>
+        </div>
+        <div class="body-part-grid" id="libraryGrid"></div>
+      </section>
+
+      <section class="panel" id="builderPanel">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Workout Builder</p>
+            <h2>Build a 45 minute session</h2>
+          </div>
+          <button class="primary-btn" id="startWorkoutBtn" type="button">Start Workout</button>
+        </div>
+
+        <div class="filter-box">
+          <p class="field-label">Body parts</p>
+          <div class="chip-row" id="bodyPartFilters"></div>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Select</th>
+                <th>Exercise</th>
+                <th>Body Part</th>
+                <th>Sets</th>
+                <th>Reps / Seconds</th>
+                <th>Rest</th>
+              </tr>
+            </thead>
+            <tbody id="builderRows"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel workout-panel" id="playerPanel">
+        <div class="timer-top">
+          <div>
+            <p class="eyebrow">Workout Timer</p>
+            <h2 id="playerTitle">No workout active</h2>
+          </div>
+          <div class="target-pill">Target 45:00</div>
+        </div>
+
+        <div class="timer-display" id="elapsedTime">00:00</div>
+        <div class="progress-bar" aria-hidden="true">
+          <span id="durationProgress"></span>
+        </div>
+
+        <div class="workout-state">
+          <div>
+            <span class="meta-label">Current exercise</span>
+            <strong id="currentExercise">None</strong>
+          </div>
+          <div>
+            <span class="meta-label">Set</span>
+            <strong id="currentSet">-</strong>
+          </div>
+          <div>
+            <span class="meta-label">Target</span>
+            <strong id="targetWork">-</strong>
+          </div>
+        </div>
+
+        <div class="active-timers">
+          <div>
+            <span class="meta-label">Set timer</span>
+            <strong id="setTimer">00:00</strong>
+          </div>
+          <div>
+            <span class="meta-label">Rest</span>
+            <strong id="restTimer">00:00</strong>
+          </div>
+        </div>
+
+        <div class="big-actions">
+          <button class="primary-btn big-btn" id="startSetBtn" type="button">Start Exercise</button>
+          <button class="accent-btn big-btn" id="finishSetBtn" type="button">Finish Set</button>
+          <button class="ghost-btn big-btn" id="skipRestBtn" type="button">Skip Rest</button>
+          <button class="ghost-btn big-btn" id="finishExerciseBtn" type="button">Finish Exercise</button>
+          <button class="danger-btn big-btn" id="finishWorkoutBtn" type="button">Finish Workout</button>
+        </div>
+
+        <div class="mini-log">
+          <h3>Completed sets</h3>
+          <div id="liveSetLog" class="set-list empty">No sets logged yet.</div>
+        </div>
+      </section>
+
+      <section class="panel" id="logPanel">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Workout Log</p>
+            <h2>Previous sessions</h2>
+          </div>
+        </div>
+        <div id="sessionList" class="session-list"></div>
+      </section>
+
+      <section class="panel" id="statsPanel">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Statistics</p>
+            <h2>Simple progress summary</h2>
+          </div>
+        </div>
+        <div class="weekly-grid" id="weeklyStats"></div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Exercise</th>
+                <th>Sets</th>
+                <th>Reps</th>
+                <th>Work Time</th>
+                <th>Sessions</th>
+              </tr>
+            </thead>
+            <tbody id="exerciseStats"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <script src="config.js" defer></script>
+    <script src="seed.js" defer></script>
+    <script src="supabaseClient.js" defer></script>
+    <script src="app.js" defer></script>
+  </body>
+</html>
