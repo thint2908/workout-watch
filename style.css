@@ -230,14 +230,14 @@ main {
   position: fixed;
   inset: 0;
   z-index: 10;
-  display: grid;
+  display: none;
   place-items: center;
   padding: 16px;
   background: rgba(0, 0, 0, 0.68);
 }
 
-.modal-backdrop[hidden] {
-  display: none;
+.modal-backdrop.is-open {
+  display: grid;
 }
 
 .modal-card {

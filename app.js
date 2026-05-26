@@ -369,7 +369,6 @@
     state.editingExerciseId = exerciseId;
     els.exerciseFormTitle.textContent = "Edit exercise";
     els.saveExerciseBtn.textContent = "Save Changes";
-    els.cancelEditBtn.hidden = false;
     els.exerciseNameInput.value = exercise.name;
     els.exerciseBodyPartInput.value = exercise.bodyPart;
     els.exerciseTypeInput.value = exercise.type;
@@ -387,7 +386,6 @@
     els.exerciseForm.reset();
     els.exerciseFormTitle.textContent = "Add exercise";
     els.saveExerciseBtn.textContent = "Add Exercise";
-    els.cancelEditBtn.hidden = true;
     els.exerciseSetsInput.value = 3;
     els.exerciseTargetInput.value = 8;
     els.exerciseRestInput.value = 60;
@@ -401,6 +399,7 @@
 
   function openExerciseModal() {
     els.exerciseModal.hidden = false;
+    els.exerciseModal.classList.add("is-open");
     document.body.classList.add("modal-open");
     window.setTimeout(function () {
       els.exerciseNameInput.focus();
@@ -408,8 +407,9 @@
   }
 
   function closeExerciseModal() {
-    els.exerciseModal.hidden = true;
+    els.exerciseModal.classList.remove("is-open");
     document.body.classList.remove("modal-open");
+    els.exerciseModal.hidden = true;
     resetExerciseForm();
   }
 
