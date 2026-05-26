@@ -35,13 +35,14 @@
       <div class="auth-card">
         <p class="eyebrow">Private access</p>
         <h2>Sign in to Workout Watch</h2>
-        <p>Only the configured owner account can load or save workout data.</p>
+        <p>Enter the owner password to load or save workout data.</p>
         <form class="auth-form" id="authForm">
+          <input id="authEmailInput" type="email" autocomplete="username" hidden>
           <label>
-            <span>Email</span>
-            <input id="authEmailInput" type="email" autocomplete="email" required>
+            <span>Password</span>
+            <input id="authPasswordInput" type="password" autocomplete="current-password" required>
           </label>
-          <button class="primary-btn" id="authSubmitBtn" type="submit">Send Magic Link</button>
+          <button class="primary-btn" id="authSubmitBtn" type="submit">Unlock App</button>
         </form>
         <p class="auth-message" id="authMessage"></p>
       </div>

@@ -14,7 +14,7 @@ A GitHub Pages friendly calisthenics workout tracker built with HTML, CSS, and v
 - Workout logs with expandable session details.
 - Exercise statistics and weekly summary.
 - Supabase cloud persistence using the public anon key plus authenticated RLS.
-- Magic-link sign-in restricted to the configured owner email.
+- Password sign-in restricted to the configured owner email.
 - Offline/local mode fallback after the owner is signed in.
 - Active workout restore after page refresh.
 - JSON export and import for backups.
@@ -57,7 +57,9 @@ Do not put a `service_role` key in this app. Frontend code must only use the pub
 - `ALLOWED_EMAIL` in `config.js`.
 - The email inside `public.is_allowed_owner()` in `schema.sql`.
 
-In Supabase, create or invite the owner user for that email. After your first successful sign-in, disable public signups in Supabase Auth settings if you do not want anyone else creating auth accounts. RLS will still block non-owner accounts from the workout tables.
+In Supabase Auth, create the owner user for that email and set a password. Then disable public signups in Supabase Auth settings. RLS will still block non-owner accounts from the workout tables.
+
+The password is never stored in this repository. The app sends it directly to Supabase Auth, receives a user session, and uses that session for database requests.
 
 ## Running Locally
 

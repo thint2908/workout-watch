@@ -152,26 +152,27 @@
     });
   }
 
-  function sendMagicLink(email) {
+  function signInWithPassword(email, password) {
     if (!isAllowedEmail(email)) {
       return Promise.reject(new Error("This email is not allowed for this app."));
     }
-    return fetch(authEndpoint("otp"), {
+    return fetch(authEndpoint("token?grant_type=password"), {
       method: "POST",
       headers: headers(),
       body: JSON.stringify({
         email: email,
-        create_user: false,
-        options: {
-          email_redirect_to: window.location.href.split("#")[0]
-        }
+        password: password
       })
     }).then(function (response) {
       if (!response.ok) {
         return response.text().then(function (text) {
-          throw new Error(text || "Magic link request failed.");
+          throw new Error(text || "Sign in failed.");
         });
       }
+      return response.json();
+    }).then(function (authSession) {
+      saveSession(authSession);
+      return getUser();
     });
   }
 
@@ -592,7 +593,7 @@
     exportData: exportData,
     importData: importData,
     initAuthFromUrl: initAuthFromUrl,
-    sendMagicLink: sendMagicLink,
+    signInWithPassword: signInWithPassword,
     signOut: signOut,
     currentUser: currentUser,
     isAuthenticated: isAuthenticated,

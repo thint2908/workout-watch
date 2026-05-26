@@ -96,6 +96,7 @@
     els.authPanel = document.getElementById("authPanel");
     els.authForm = document.getElementById("authForm");
     els.authEmailInput = document.getElementById("authEmailInput");
+    els.authPasswordInput = document.getElementById("authPasswordInput");
     els.authSubmitBtn = document.getElementById("authSubmitBtn");
     els.authMessage = document.getElementById("authMessage");
     els.userPill = document.getElementById("userPill");
@@ -112,7 +113,7 @@
       });
     });
 
-    els.authForm.addEventListener("submit", sendLoginLink);
+    els.authForm.addEventListener("submit", signInWithPassword);
     els.signOutBtn.addEventListener("click", signOut);
     els.startWorkoutBtn.addEventListener("click", startWorkout);
     els.openExerciseEditorBtn.addEventListener("click", openNewExerciseModal);
@@ -153,21 +154,33 @@
     } else {
       els.userPill.textContent = "";
       els.authEmailInput.value = window.WorkoutConfig.ALLOWED_EMAIL || "";
+      els.authPasswordInput.value = "";
     }
   }
 
-  function sendLoginLink(event) {
+  function signInWithPassword(event) {
     event.preventDefault();
-    var email = els.authEmailInput.value.trim();
+    var email = window.WorkoutConfig.ALLOWED_EMAIL || els.authEmailInput.value.trim();
+    var password = els.authPasswordInput.value;
     els.authSubmitBtn.disabled = true;
     els.authMessage.textContent = "";
-    WorkoutDb.sendMagicLink(email).then(function () {
-      els.authMessage.textContent = "Magic link sent. Check your email, then open the link on this device.";
+    WorkoutDb.signInWithPassword(email, password).then(function () {
+      setAuthenticatedUi(true);
+      els.authPasswordInput.value = "";
+      loadAppData();
     }).catch(function (error) {
-      els.authMessage.textContent = error.message || "Could not send magic link.";
+      els.authMessage.textContent = readableAuthError(error);
     }).finally(function () {
       els.authSubmitBtn.disabled = false;
     });
+  }
+
+  function readableAuthError(error) {
+    var message = error && error.message ? error.message : "Sign in failed.";
+    if (message.indexOf("Invalid login credentials") >= 0) {
+      return "Wrong password.";
+    }
+    return message;
   }
 
   function signOut() {
