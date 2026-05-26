@@ -25,6 +25,10 @@ body {
   line-height: 1.5;
 }
 
+body.modal-open {
+  overflow: hidden;
+}
+
 button,
 input,
 select {
@@ -182,6 +186,13 @@ main {
   margin-bottom: 16px;
 }
 
+.builder-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
 .body-part-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
@@ -207,16 +218,36 @@ main {
   padding: 16px;
 }
 
-.exercise-form {
-  margin-top: 16px;
-}
-
 .form-heading {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 12px;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.68);
+}
+
+.modal-backdrop[hidden] {
+  display: none;
+}
+
+.modal-card {
+  width: min(780px, 100%);
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+}
+
+.modal-card .exercise-form {
+  box-shadow: var(--shadow);
 }
 
 .form-heading h3 {
@@ -535,11 +566,13 @@ th {
   }
 
   .header-actions,
+  .builder-actions,
   .section-heading > .primary-btn {
     width: 100%;
   }
 
   .header-actions > *,
+  .builder-actions > *,
   .section-heading > .primary-btn {
     flex: 1;
   }

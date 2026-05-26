@@ -47,6 +47,8 @@
     els.libraryGrid = document.getElementById("libraryGrid");
     els.bodyPartFilters = document.getElementById("bodyPartFilters");
     els.builderRows = document.getElementById("builderRows");
+    els.openExerciseEditorBtn = document.getElementById("openExerciseEditorBtn");
+    els.exerciseModal = document.getElementById("exerciseModal");
     els.exerciseForm = document.getElementById("exerciseForm");
     els.exerciseFormTitle = document.getElementById("exerciseFormTitle");
     els.exerciseNameInput = document.getElementById("exerciseNameInput");
@@ -92,8 +94,19 @@
     });
 
     els.startWorkoutBtn.addEventListener("click", startWorkout);
+    els.openExerciseEditorBtn.addEventListener("click", openNewExerciseModal);
     els.exerciseForm.addEventListener("submit", saveExerciseFromForm);
-    els.cancelEditBtn.addEventListener("click", resetExerciseForm);
+    els.cancelEditBtn.addEventListener("click", closeExerciseModal);
+    els.exerciseModal.addEventListener("click", function (event) {
+      if (event.target === els.exerciseModal) {
+        closeExerciseModal();
+      }
+    });
+    document.addEventListener("keydown", function (event) {
+      if (event.key === "Escape" && !els.exerciseModal.hidden) {
+        closeExerciseModal();
+      }
+    });
     els.startSetBtn.addEventListener("click", startSet);
     els.finishSetBtn.addEventListener("click", finishSet);
     els.skipRestBtn.addEventListener("click", skipRest);
@@ -333,6 +346,7 @@
         restSeconds: suggestedRest(saved)
       };
       resetExerciseForm();
+      closeExerciseModal();
       renderAll();
       updateModeWarning();
       showToast(wasEditing ? "Exercise updated." : "Exercise added.");
@@ -364,6 +378,7 @@
     els.exerciseRestInput.value = exercise.defaultRestSeconds;
     els.exerciseDifficultyInput.value = exercise.difficulty || "normal";
     els.exerciseNoteInput.value = exercise.note || "";
+    openExerciseModal();
     els.exerciseNameInput.focus();
   }
 
@@ -377,6 +392,25 @@
     els.exerciseTargetInput.value = 8;
     els.exerciseRestInput.value = 60;
     els.exerciseDifficultyInput.value = "normal";
+  }
+
+  function openNewExerciseModal() {
+    resetExerciseForm();
+    openExerciseModal();
+  }
+
+  function openExerciseModal() {
+    els.exerciseModal.hidden = false;
+    document.body.classList.add("modal-open");
+    window.setTimeout(function () {
+      els.exerciseNameInput.focus();
+    }, 0);
+  }
+
+  function closeExerciseModal() {
+    els.exerciseModal.hidden = true;
+    document.body.classList.remove("modal-open");
+    resetExerciseForm();
   }
 
   function removeExercise(exerciseId) {
