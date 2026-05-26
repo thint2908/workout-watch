@@ -2,8 +2,10 @@
   "use strict";
 
   var LOCAL_PREFIX = "workout-watch:supabase-fallback:";
+  var SESSION_KEY = "workout-watch:supabase-session";
   var online = false;
   var offlineReason = "";
+  var session = null;
 
   function config() {
     return window.WorkoutConfig || {};
@@ -13,11 +15,25 @@
     return Boolean(config().SUPABASE_URL && config().SUPABASE_ANON_KEY);
   }
 
+  function allowedEmail() {
+    return (config().ALLOWED_EMAIL || "").trim().toLowerCase();
+  }
+
+  function isAllowedEmail(email) {
+    var allowed = allowedEmail();
+    return Boolean(email && allowed && email.trim().toLowerCase() === allowed);
+  }
+
+  function authEndpoint(path) {
+    return config().SUPABASE_URL.replace(/\/$/, "") + "/auth/v1/" + path;
+  }
+
   function headers(extra) {
     var anonKey = config().SUPABASE_ANON_KEY;
+    var bearer = session && session.access_token ? session.access_token : anonKey;
     return Object.assign({
       apikey: anonKey,
-      Authorization: "Bearer " + anonKey,
+      Authorization: "Bearer " + bearer,
       "Content-Type": "application/json"
     }, extra || {});
   }
@@ -55,6 +71,122 @@
       offlineReason = error.message || "Supabase request failed.";
       throw error;
     });
+  }
+
+  function loadSession() {
+    session = localGet("session", null);
+    if (session && session.expires_at && Date.now() >= session.expires_at * 1000) {
+      clearSession();
+    }
+    return session;
+  }
+
+  function saveSession(authSession) {
+    session = authSession;
+    localStorage.setItem(SESSION_KEY, JSON.stringify(authSession));
+    localSet("session", authSession);
+    return session;
+  }
+
+  function clearSession() {
+    session = null;
+    localStorage.removeItem(SESSION_KEY);
+    localStorage.removeItem(LOCAL_PREFIX + "session");
+  }
+
+  function sessionFromHash() {
+    if (!window.location.hash || window.location.hash.indexOf("access_token=") < 0) {
+      return null;
+    }
+    var params = new URLSearchParams(window.location.hash.slice(1));
+    var accessToken = params.get("access_token");
+    if (!accessToken) {
+      return null;
+    }
+    return {
+      access_token: accessToken,
+      refresh_token: params.get("refresh_token"),
+      token_type: params.get("token_type") || "bearer",
+      expires_at: Math.floor(Date.now() / 1000) + cleanNumber(params.get("expires_in"), 3600),
+      user: null
+    };
+  }
+
+  function cleanNumber(value, fallback) {
+    var parsed = parseInt(value, 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+  }
+
+  function getUser() {
+    if (!session || !session.access_token) {
+      return Promise.resolve(null);
+    }
+    return fetch(authEndpoint("user"), {
+      headers: headers()
+    }).then(function (response) {
+      if (!response.ok) {
+        throw new Error("Could not load authenticated user.");
+      }
+      return response.json();
+    }).then(function (user) {
+      session.user = user;
+      saveSession(session);
+      return user;
+    });
+  }
+
+  function initAuthFromUrl() {
+    if (!hasConfig()) {
+      return Promise.resolve(null);
+    }
+    var hashSession = sessionFromHash();
+    if (hashSession) {
+      saveSession(hashSession);
+      history.replaceState(null, document.title, window.location.pathname + window.location.search);
+    } else {
+      loadSession();
+    }
+    return getUser().catch(function () {
+      clearSession();
+      return null;
+    });
+  }
+
+  function sendMagicLink(email) {
+    if (!isAllowedEmail(email)) {
+      return Promise.reject(new Error("This email is not allowed for this app."));
+    }
+    return fetch(authEndpoint("otp"), {
+      method: "POST",
+      headers: headers(),
+      body: JSON.stringify({
+        email: email,
+        create_user: false,
+        options: {
+          email_redirect_to: window.location.href.split("#")[0]
+        }
+      })
+    }).then(function (response) {
+      if (!response.ok) {
+        return response.text().then(function (text) {
+          throw new Error(text || "Magic link request failed.");
+        });
+      }
+    });
+  }
+
+  function signOut() {
+    clearSession();
+    return Promise.resolve();
+  }
+
+  function currentUser() {
+    return session && session.user ? session.user : null;
+  }
+
+  function isAuthenticated() {
+    var user = currentUser();
+    return Boolean(user && isAllowedEmail(user.email));
   }
 
   function localGet(key, fallback) {
@@ -176,6 +308,9 @@
   }
 
   function localExercises() {
+    if (!isAuthenticated()) {
+      return Promise.reject(new Error("Sign in required."));
+    }
     var exercises = localGet("exercises", null);
     if (!exercises || !exercises.length) {
       exercises = window.WorkoutSeed.exercises.map(function (exercise) {
@@ -205,6 +340,9 @@
     }).then(function (rows) {
       return rows.map(dbToExercise);
     }).catch(function () {
+      if (!isAuthenticated()) {
+        return Promise.reject(new Error("Sign in required."));
+      }
       return localExercises();
     });
   }
@@ -221,6 +359,9 @@
       localSet("exercises", exercises);
       return saved;
     }).catch(function () {
+      if (!isAuthenticated()) {
+        return Promise.reject(new Error("Sign in required."));
+      }
       var exercises = localGet("exercises", []);
       var saved = Object.assign({}, exercise, { id: localId("exercise") });
       exercises.push(saved);
@@ -242,6 +383,9 @@
       }));
       return saved;
     }).catch(function () {
+      if (!isAuthenticated()) {
+        return Promise.reject(new Error("Sign in required."));
+      }
       var exercises = localGet("exercises", []);
       var saved = Object.assign({}, exercise, { id: exerciseId });
       localSet("exercises", exercises.map(function (item) {
@@ -264,6 +408,9 @@
         return item.id !== exerciseId;
       }));
     }).catch(function () {
+      if (!isAuthenticated()) {
+        return Promise.reject(new Error("Sign in required."));
+      }
       var exercises = localGet("exercises", []);
       localSet("exercises", exercises.filter(function (item) {
         return item.id !== exerciseId;
@@ -279,6 +426,9 @@
     }).then(function (rows) {
       return rows[0];
     }).catch(function () {
+      if (!isAuthenticated()) {
+        return Promise.reject(new Error("Sign in required."));
+      }
       var sessions = localGet("sessions", []);
       var session = {
         id: localId("session"),
@@ -302,6 +452,9 @@
     }).then(function (rows) {
       return dbToSet(rows[0]);
     }).catch(function () {
+      if (!isAuthenticated()) {
+        return Promise.reject(new Error("Sign in required."));
+      }
       return Promise.resolve(Object.assign({ id: localId("set") }, set));
     });
   }
@@ -331,6 +484,9 @@
     }).then(function (rows) {
       return rows[0];
     }).catch(function () {
+      if (!isAuthenticated()) {
+        return Promise.reject(new Error("Sign in required."));
+      }
       var sessions = localGet("sessions", []);
       var session = sessions.find(function (item) {
         return item.id === sessionId;
@@ -357,6 +513,9 @@
       localSet("sessions", sessions);
       return sessions;
     }).catch(function () {
+      if (!isAuthenticated()) {
+        return Promise.reject(new Error("Sign in required."));
+      }
       return Promise.resolve(localGet("sessions", []));
     });
   }
@@ -382,6 +541,9 @@
     }).then(function () {
       return seedExercises();
     }).catch(function () {
+      if (!isAuthenticated()) {
+        return Promise.reject(new Error("Sign in required."));
+      }
       localSet("sessions", []);
       localSet("exercises", window.WorkoutSeed.exercises);
       localStorage.removeItem(LOCAL_PREFIX + "activeWorkout");
@@ -429,6 +591,12 @@
     deleteAllData: deleteAllData,
     exportData: exportData,
     importData: importData,
+    initAuthFromUrl: initAuthFromUrl,
+    sendMagicLink: sendMagicLink,
+    signOut: signOut,
+    currentUser: currentUser,
+    isAuthenticated: isAuthenticated,
+    isAllowedEmail: isAllowedEmail,
     isOnline: function () {
       return online;
     },

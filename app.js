@@ -20,6 +20,18 @@
   function init() {
     cacheElements();
     bindEvents();
+    setAuthenticatedUi(false);
+    WorkoutDb.initAuthFromUrl().then(function () {
+      if (!WorkoutDb.isAuthenticated()) {
+        setAuthenticatedUi(false);
+        return;
+      }
+      setAuthenticatedUi(true);
+      loadAppData();
+    });
+  }
+
+  function loadAppData() {
     Promise.all([
       WorkoutDb.listExercises(),
       WorkoutDb.listSessions(),
@@ -81,6 +93,13 @@
     els.exerciseStats = document.getElementById("exerciseStats");
     els.toast = document.getElementById("toast");
     els.modeWarning = document.getElementById("modeWarning");
+    els.authPanel = document.getElementById("authPanel");
+    els.authForm = document.getElementById("authForm");
+    els.authEmailInput = document.getElementById("authEmailInput");
+    els.authSubmitBtn = document.getElementById("authSubmitBtn");
+    els.authMessage = document.getElementById("authMessage");
+    els.userPill = document.getElementById("userPill");
+    els.signOutBtn = document.getElementById("signOutBtn");
     els.exportBtn = document.getElementById("exportBtn");
     els.importFile = document.getElementById("importFile");
     els.resetBtn = document.getElementById("resetBtn");
@@ -93,6 +112,8 @@
       });
     });
 
+    els.authForm.addEventListener("submit", sendLoginLink);
+    els.signOutBtn.addEventListener("click", signOut);
     els.startWorkoutBtn.addEventListener("click", startWorkout);
     els.openExerciseEditorBtn.addEventListener("click", openNewExerciseModal);
     els.exerciseForm.addEventListener("submit", saveExerciseFromForm);
@@ -119,6 +140,48 @@
 
   function clone(value) {
     return JSON.parse(JSON.stringify(value));
+  }
+
+  function setAuthenticatedUi(isAuthenticated) {
+    document.body.classList.toggle("is-authenticated", isAuthenticated);
+    els.authPanel.hidden = isAuthenticated;
+    els.signOutBtn.hidden = !isAuthenticated;
+    els.userPill.hidden = !isAuthenticated;
+    if (isAuthenticated) {
+      var user = WorkoutDb.currentUser();
+      els.userPill.textContent = user ? user.email : "";
+    } else {
+      els.userPill.textContent = "";
+      els.authEmailInput.value = window.WorkoutConfig.ALLOWED_EMAIL || "";
+    }
+  }
+
+  function sendLoginLink(event) {
+    event.preventDefault();
+    var email = els.authEmailInput.value.trim();
+    els.authSubmitBtn.disabled = true;
+    els.authMessage.textContent = "";
+    WorkoutDb.sendMagicLink(email).then(function () {
+      els.authMessage.textContent = "Magic link sent. Check your email, then open the link on this device.";
+    }).catch(function (error) {
+      els.authMessage.textContent = error.message || "Could not send magic link.";
+    }).finally(function () {
+      els.authSubmitBtn.disabled = false;
+    });
+  }
+
+  function signOut() {
+    WorkoutDb.signOut().then(function () {
+      state.exercises = [];
+      state.sessions = [];
+      state.activeWorkout = null;
+      state.builder = {};
+      setAuthenticatedUi(false);
+      renderPlayer();
+      renderLog();
+      renderStats();
+      showToast("Signed out.");
+    });
   }
 
   function persistActiveWorkout() {
