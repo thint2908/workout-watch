@@ -7,6 +7,7 @@
     sessions: [],
     selectedBodyParts: [],
     builder: {},
+    builderSelectionCounter: 0,
     editingExerciseId: null,
     activeWorkout: null,
     activeTab: "library",
@@ -241,13 +242,23 @@
 
   function seedBuilderDefaults() {
     state.exercises.forEach(function (exercise) {
+      var existing = state.builder[exercise.id];
       state.builder[exercise.id] = {
-        selected: state.builder[exercise.id] ? state.builder[exercise.id].selected : false,
-        sets: state.builder[exercise.id] ? state.builder[exercise.id].sets : exercise.defaultSets,
-        target: state.builder[exercise.id] ? state.builder[exercise.id].target : defaultTarget(exercise),
-        restSeconds: state.builder[exercise.id] ? state.builder[exercise.id].restSeconds : suggestedRest(exercise)
+        selected: existing ? existing.selected : false,
+        selectionOrder: existing ? existing.selectionOrder : null,
+        sets: existing ? existing.sets : exercise.defaultSets,
+        target: existing ? existing.target : defaultTarget(exercise),
+        restSeconds: existing ? existing.restSeconds : suggestedRest(exercise)
       };
+      if (state.builder[exercise.id].selected && !state.builder[exercise.id].selectionOrder) {
+        state.builder[exercise.id].selectionOrder = nextBuilderSelectionOrder();
+      }
     });
+  }
+
+  function nextBuilderSelectionOrder() {
+    state.builderSelectionCounter += 1;
+    return state.builderSelectionCounter;
   }
 
   function defaultTarget(exercise) {
@@ -383,6 +394,7 @@
       var buttons = row.querySelectorAll("button");
       inputs[0].addEventListener("change", function (event) {
         config.selected = event.target.checked;
+        config.selectionOrder = config.selected ? nextBuilderSelectionOrder() : null;
         renderBuilderEta();
       });
       inputs[1].addEventListener("input", function (event) {
@@ -654,10 +666,17 @@
   function selectedWorkoutItems() {
     return state.exercises.filter(function (exercise) {
       return state.builder[exercise.id] && state.builder[exercise.id].selected;
+    }).sort(function (a, b) {
+      return selectionOrderForExercise(a) - selectionOrderForExercise(b);
     }).map(function (exercise) {
       var config = state.builder[exercise.id];
       return workoutItemFromExercise(exercise, config, 0);
     });
+  }
+
+  function selectionOrderForExercise(exercise) {
+    var config = state.builder[exercise.id];
+    return config && config.selectionOrder ? config.selectionOrder : Number.MAX_SAFE_INTEGER;
   }
 
   function workoutItemFromExercise(exercise, config, order) {
