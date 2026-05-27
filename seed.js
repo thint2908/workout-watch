@@ -7,6 +7,7 @@
     "Back",
     "Core",
     "Legs",
+    "Cardio",
     "Full body"
   ];
 
@@ -329,6 +330,182 @@
       defaultRestSeconds: 30,
       difficulty: "easy",
       note: "Low-impact jumping jack alternative"
+    },
+    {
+      id: "jump-rope-imaginary",
+      name: "Jump rope imaginary",
+      bodyPart: "Full body",
+      type: "time",
+      defaultSets: 4,
+      defaultSeconds: 60,
+      defaultRestSeconds: 30,
+      difficulty: "easy",
+      note: "Simulated jump rope without actual rope"
+    },
+    {
+      id: "fast-feet",
+      name: "Fast feet",
+      bodyPart: "Full body",
+      type: "time",
+      defaultSets: 4,
+      defaultSeconds: 30,
+      defaultRestSeconds: 30,
+      difficulty: "easy",
+      note: "Very quick small running steps in place"
+    },
+    {
+      id: "skater-step",
+      name: "Skater step",
+      bodyPart: "Full body",
+      type: "time",
+      defaultSets: 4,
+      defaultSeconds: 40,
+      defaultRestSeconds: 45,
+      difficulty: "normal",
+      note: "Side-to-side stepping cardio"
+    },
+    {
+      id: "shadow-boxing",
+      name: "Shadow boxing",
+      bodyPart: "Full body",
+      type: "time",
+      defaultSets: 4,
+      defaultSeconds: 60,
+      defaultRestSeconds: 30,
+      difficulty: "easy",
+      note: "Light boxing combinations for cardio"
+    },
+    {
+      id: "burpee",
+      name: "Burpee",
+      bodyPart: "Full body",
+      type: "reps",
+      defaultSets: 4,
+      defaultReps: 10,
+      defaultRestSeconds: 90,
+      difficulty: "hard",
+      note: "High intensity full body cardio"
+    },
+    {
+      id: "half-burpee",
+      name: "Half burpee",
+      bodyPart: "Full body",
+      type: "reps",
+      defaultSets: 4,
+      defaultReps: 12,
+      defaultRestSeconds: 60,
+      difficulty: "normal",
+      note: "Burpee variation without push-up"
+    },
+    {
+      id: "squat-pulse",
+      name: "Squat pulse",
+      bodyPart: "Legs",
+      type: "time",
+      defaultSets: 3,
+      defaultSeconds: 40,
+      defaultRestSeconds: 45,
+      difficulty: "normal",
+      note: "Continuous squat pulse movement"
+    },
+    {
+      id: "jump-squat",
+      name: "Jump squat",
+      bodyPart: "Legs",
+      type: "reps",
+      defaultSets: 4,
+      defaultReps: 10,
+      defaultRestSeconds: 75,
+      difficulty: "hard",
+      note: "Explosive squat jumps, land softly"
+    },
+    {
+      id: "lateral-shuffle",
+      name: "Lateral shuffle",
+      bodyPart: "Full body",
+      type: "time",
+      defaultSets: 4,
+      defaultSeconds: 30,
+      defaultRestSeconds: 30,
+      difficulty: "normal",
+      note: "Quick side shuffle in small space"
+    },
+    {
+      id: "bear-crawl-hold",
+      name: "Bear crawl hold",
+      bodyPart: "Core",
+      type: "time",
+      defaultSets: 3,
+      defaultSeconds: 30,
+      defaultRestSeconds: 45,
+      difficulty: "normal",
+      note: "Static bear crawl hold"
+    },
+    {
+      id: "bear-crawl-steps",
+      name: "Bear crawl steps",
+      bodyPart: "Full body",
+      type: "time",
+      defaultSets: 3,
+      defaultSeconds: 30,
+      defaultRestSeconds: 45,
+      difficulty: "hard",
+      note: "Small forward/backward crawl"
+    },
+    {
+      id: "plank-jack",
+      name: "Plank jack",
+      bodyPart: "Core",
+      type: "time",
+      defaultSets: 3,
+      defaultSeconds: 30,
+      defaultRestSeconds: 45,
+      difficulty: "normal",
+      note: "Plank with jumping feet"
+    },
+    {
+      id: "toe-taps",
+      name: "Toe taps",
+      bodyPart: "Full body",
+      type: "time",
+      defaultSets: 4,
+      defaultSeconds: 45,
+      defaultRestSeconds: 30,
+      difficulty: "easy",
+      note: "Rapid alternating toe taps"
+    },
+    {
+      id: "step-up-on-chair",
+      name: "Step-up on chair",
+      bodyPart: "Legs",
+      type: "reps",
+      defaultSets: 3,
+      defaultReps: 12,
+      defaultRestSeconds: 60,
+      difficulty: "normal",
+      note: "Requires stable chair"
+    },
+    {
+      id: "sprint-in-place",
+      name: "Sprint in place",
+      bodyPart: "Full body",
+      type: "time",
+      defaultSets: 5,
+      defaultSeconds: 20,
+      defaultRestSeconds: 40,
+      difficulty: "hard",
+      note: "Max effort running in place"
+    },
+    {
+      id: "tabata-mountain-climber",
+      name: "Tabata mountain climber",
+      bodyPart: "Full body",
+      type: "time",
+      defaultSets: 8,
+      defaultSeconds: 20,
+      defaultRestSeconds: 10,
+      difficulty: "hard",
+      note: "Tabata style intervals"
     }
   ];
 

@@ -4,7 +4,7 @@ A GitHub Pages friendly calisthenics workout tracker built with HTML, CSS, and v
 
 ## Features
 
-- Default home calisthenics exercise library with 29 upper body, arms, back, core, legs, and full-body movements.
+- Default home calisthenics exercise library with 45 upper body, arms, back, core, legs, cardio, and full-body movements.
 - Workout builder with editable sets, reps or seconds, and rest time.
 - Active workout editing: add more exercises, adjust pending targets, remove unfinished exercises, and reorder the active plan without restarting the session.
 - Intelligent default rest suggestions:
