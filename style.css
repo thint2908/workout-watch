@@ -320,6 +320,45 @@ main {
   box-shadow: var(--shadow);
 }
 
+.dialog-card {
+  width: min(460px, 100%);
+}
+
+.dialog-form {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+  padding: 16px;
+}
+
+.dialog-message {
+  margin-bottom: 14px;
+  color: var(--muted);
+}
+
+.dialog-input-row {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.dialog-input-row[hidden] {
+  display: none;
+}
+
+.dialog-input-row span {
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 800;
+}
+
+.dialog-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
 .form-heading h3 {
   margin-bottom: 0;
 }
@@ -343,7 +382,8 @@ main {
 }
 
 .form-grid input,
-.form-grid select {
+.form-grid select,
+.dialog-input-row input {
   width: 100%;
   min-height: 42px;
   border: 1px solid var(--line);
@@ -592,6 +632,11 @@ th {
   align-items: center;
 }
 
+.active-plan-main > div {
+  display: grid;
+  gap: 2px;
+}
+
 .active-plan-main strong,
 .active-plan-main small {
   overflow-wrap: anywhere;
@@ -657,6 +702,23 @@ th {
   padding: 10px;
   border-radius: 8px;
   background: var(--panel-2);
+}
+
+.set-row-main {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.log-set-row {
+  align-items: stretch;
+}
+
+.log-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
 }
 
 .toast {
@@ -743,6 +805,11 @@ th {
   .active-plan-actions {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  .log-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
   }
 
   .form-heading {

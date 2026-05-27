@@ -247,6 +247,28 @@
       </div>
     </div>
 
+    <div class="modal-backdrop" id="appDialog" hidden>
+      <div class="modal-card dialog-card" role="dialog" aria-modal="true" aria-labelledby="appDialogTitle">
+        <form class="dialog-form" id="appDialogForm">
+          <div class="form-heading">
+            <div>
+              <p class="field-label" id="appDialogKicker">Workout Watch</p>
+              <h3 id="appDialogTitle">Confirm action</h3>
+            </div>
+          </div>
+          <p class="dialog-message" id="appDialogMessage"></p>
+          <label class="dialog-input-row" id="appDialogInputRow" hidden>
+            <span id="appDialogInputLabel">Value</span>
+            <input id="appDialogInput" type="number" inputmode="numeric">
+          </label>
+          <div class="dialog-actions">
+            <button class="ghost-btn" id="appDialogCancelBtn" type="button">Cancel</button>
+            <button class="primary-btn" id="appDialogConfirmBtn" type="submit">OK</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
     <script src="config.js?v=20260526-auth" defer></script>

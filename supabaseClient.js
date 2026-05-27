@@ -474,6 +474,89 @@
     });
   }
 
+  function updateSet(setId, set) {
+    return request("workout_sets?id=eq." + encodeURIComponent(setId), {
+      method: "PATCH",
+      headers: headers({ Prefer: "return=representation" }),
+      body: JSON.stringify(setToDb(set))
+    }).then(function (rows) {
+      return dbToSet(rows[0]);
+    }).catch(function () {
+      if (!isAuthenticated()) {
+        return Promise.reject(new Error("Sign in required."));
+      }
+      var sessions = localGet("sessions", []);
+      var updated = Object.assign({}, set, { id: setId });
+      sessions.forEach(function (session) {
+        session.completedSets = (session.completedSets || []).map(function (item) {
+          return item.id === setId ? updated : item;
+        });
+      });
+      localSet("sessions", sessions);
+      return updated;
+    });
+  }
+
+  function deleteSet(setId) {
+    return request("workout_sets?id=eq." + encodeURIComponent(setId), {
+      method: "DELETE",
+      headers: headers({ Prefer: "return=minimal" })
+    }).then(function () {
+      removeLocalSet(setId);
+    }).catch(function () {
+      if (!isAuthenticated()) {
+        return Promise.reject(new Error("Sign in required."));
+      }
+      removeLocalSet(setId);
+    });
+  }
+
+  function removeLocalSet(setId) {
+    var sessions = localGet("sessions", []);
+    sessions.forEach(function (session) {
+      session.completedSets = (session.completedSets || []).filter(function (set) {
+        return set.id !== setId;
+      });
+      session.selectedExercises = selectedExercisesFromSets(session.completedSets);
+    });
+    localSet("sessions", sessions);
+  }
+
+  function deleteSession(sessionId) {
+    return request("workout_sessions?id=eq." + encodeURIComponent(sessionId), {
+      method: "DELETE",
+      headers: headers({ Prefer: "return=minimal" })
+    }).then(function () {
+      removeLocalSession(sessionId);
+    }).catch(function () {
+      if (!isAuthenticated()) {
+        return Promise.reject(new Error("Sign in required."));
+      }
+      removeLocalSession(sessionId);
+    });
+  }
+
+  function removeLocalSession(sessionId) {
+    var sessions = localGet("sessions", []);
+    localSet("sessions", sessions.filter(function (session) {
+      return session.id !== sessionId;
+    }));
+  }
+
+  function selectedExercisesFromSets(sets) {
+    var exerciseMap = {};
+    (sets || []).forEach(function (set) {
+      exerciseMap[set.exerciseId] = {
+        id: set.exerciseId,
+        name: set.exerciseName,
+        type: set.type
+      };
+    });
+    return Object.keys(exerciseMap).map(function (key) {
+      return exerciseMap[key];
+    });
+  }
+
   function finishSession(sessionId, finishedAt, totalDurationSeconds, selectedExercises, completedSets) {
     return request("workout_sessions?id=eq." + encodeURIComponent(sessionId), {
       method: "PATCH",
@@ -585,6 +668,9 @@
     createSession: createSession,
     saveSet: saveSet,
     updateSetRest: updateSetRest,
+    updateSet: updateSet,
+    deleteSet: deleteSet,
+    deleteSession: deleteSession,
     finishSession: finishSession,
     listSessions: listSessions,
     saveActiveWorkout: saveActiveWorkout,

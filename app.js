@@ -108,6 +108,16 @@
     els.exportBtn = document.getElementById("exportBtn");
     els.importFile = document.getElementById("importFile");
     els.resetBtn = document.getElementById("resetBtn");
+    els.appDialog = document.getElementById("appDialog");
+    els.appDialogForm = document.getElementById("appDialogForm");
+    els.appDialogKicker = document.getElementById("appDialogKicker");
+    els.appDialogTitle = document.getElementById("appDialogTitle");
+    els.appDialogMessage = document.getElementById("appDialogMessage");
+    els.appDialogInputRow = document.getElementById("appDialogInputRow");
+    els.appDialogInputLabel = document.getElementById("appDialogInputLabel");
+    els.appDialogInput = document.getElementById("appDialogInput");
+    els.appDialogCancelBtn = document.getElementById("appDialogCancelBtn");
+    els.appDialogConfirmBtn = document.getElementById("appDialogConfirmBtn");
   }
 
   function bindEvents() {
@@ -132,6 +142,8 @@
     document.addEventListener("keydown", function (event) {
       if (event.key === "Escape" && !els.exerciseModal.hidden) {
         closeExerciseModal();
+      } else if (event.key === "Escape" && !els.appDialog.hidden) {
+        cancelAppDialog();
       }
     });
     els.startSetBtn.addEventListener("click", startSet);
@@ -142,6 +154,8 @@
     els.exportBtn.addEventListener("click", exportJson);
     els.importFile.addEventListener("change", importJson);
     els.resetBtn.addEventListener("click", resetDemoData);
+    els.appDialogForm.addEventListener("submit", submitAppDialog);
+    els.appDialogCancelBtn.addEventListener("click", cancelAppDialog);
   }
 
   function clone(value) {
@@ -505,11 +519,20 @@
     if (!exercise) {
       return;
     }
-    if (!window.confirm("Remove " + exercise.name + " from the exercise list? Workout logs will keep the exercise name.")) {
-      return;
-    }
-
-    WorkoutDb.deleteExercise(exerciseId).then(function () {
+    confirmDialog({
+      title: "Remove exercise?",
+      message: "Remove " + exercise.name + " from the exercise list? Workout logs will keep the exercise name.",
+      confirmText: "Remove",
+      danger: true
+    }).then(function (confirmed) {
+      if (!confirmed) {
+        return null;
+      }
+      return WorkoutDb.deleteExercise(exerciseId);
+    }).then(function (deleted) {
+      if (deleted === null) {
+        return;
+      }
       state.exercises = state.exercises.filter(function (item) {
         return item.id !== exerciseId;
       });
@@ -656,14 +679,21 @@
     if (!state.activeWorkout) {
       return;
     }
-    if (!window.confirm("Discard the current workout and start a new one? Saved set logs will remain in the log database.")) {
-      return;
-    }
-    state.activeWorkout = null;
-    persistActiveWorkout().then(function () {
-      renderBuilder();
-      renderPlayer();
-      showToast("Current workout discarded. Choose exercises and start again.");
+    confirmDialog({
+      title: "Discard current workout?",
+      message: "Discard the current workout and start a new one? Saved set logs will remain in the log database.",
+      confirmText: "Discard",
+      danger: true
+    }).then(function (confirmed) {
+      if (!confirmed) {
+        return;
+      }
+      state.activeWorkout = null;
+      persistActiveWorkout().then(function () {
+        renderBuilder();
+        renderPlayer();
+        showToast("Current workout discarded. Choose exercises and start again.");
+      });
     });
   }
 
@@ -807,34 +837,55 @@
 
     var elapsed = Math.max(1, secondsBetween(workout.setStartedAt, Date.now()));
     var duration = plan.type === "time" && options.auto ? plan.target : elapsed;
-    var actualReps = plan.type === "reps" ? askForReps(plan.target) : null;
-    var setLog = {
-      sessionId: workout.id,
-      workoutItemId: plan.itemId,
-      exerciseId: plan.id,
-      exerciseName: plan.name,
-      bodyPart: plan.bodyPart,
-      type: plan.type,
-      setNumber: workout.setNumber,
-      target: plan.target,
-      reps: actualReps,
-      setDurationSeconds: duration,
-      restDurationSeconds: plan.restSeconds,
-      loggedAt: new Date().toISOString()
-    };
-
     els.finishSetBtn.disabled = true;
     workout.savingSetKey = setKey;
-    WorkoutDb.saveSet(setLog).then(function (savedSet) {
-      workout.completedSets.push(Object.assign(setLog, savedSet || {}));
-      workout.status = "resting";
-      workout.savingSetKey = null;
-      workout.setStartedAt = null;
-      workout.setEndsAt = null;
-      workout.restStartedAt = Date.now();
-      workout.restEndsAt = workout.restStartedAt + plan.restSeconds * 1000;
-      return persistActiveWorkout();
-    }).then(function () {
+    var repsInput = plan.type === "reps" ?
+      numberDialog({
+        title: "Finish set",
+        message: plan.name + " · Set " + workout.setNumber,
+        label: "Actual reps",
+        value: plan.target,
+        min: 1,
+        max: 999,
+        confirmText: "Save Set"
+      }) :
+      Promise.resolve(null);
+
+    repsInput.then(function (actualReps) {
+      if (plan.type === "reps" && actualReps === null) {
+        workout.savingSetKey = null;
+        renderPlayer();
+        return null;
+      }
+      var setLog = {
+        sessionId: workout.id,
+        workoutItemId: plan.itemId,
+        exerciseId: plan.id,
+        exerciseName: plan.name,
+        bodyPart: plan.bodyPart,
+        type: plan.type,
+        setNumber: workout.setNumber,
+        target: plan.target,
+        reps: actualReps,
+        setDurationSeconds: duration,
+        restDurationSeconds: plan.restSeconds,
+        loggedAt: new Date().toISOString()
+      };
+
+      return WorkoutDb.saveSet(setLog).then(function (savedSet) {
+        workout.completedSets.push(Object.assign(setLog, savedSet || {}));
+        workout.status = "resting";
+        workout.savingSetKey = null;
+        workout.setStartedAt = null;
+        workout.setEndsAt = null;
+        workout.restStartedAt = Date.now();
+        workout.restEndsAt = workout.restStartedAt + plan.restSeconds * 1000;
+        return persistActiveWorkout();
+      });
+    }).then(function (saved) {
+      if (saved === null) {
+        return;
+      }
       updateModeWarning();
       renderPlayer();
     }).catch(function () {
@@ -843,16 +894,6 @@
       updateModeWarning();
       renderPlayer();
     });
-  }
-
-  // prompt() is intentionally used here to keep the app dependency-free and
-  // usable from a single static HTML page.
-  function askForReps(defaultReps) {
-    var answer = window.prompt("Actual reps completed?", String(defaultReps));
-    if (answer === null || answer.trim() === "") {
-      return defaultReps;
-    }
-    return cleanNumber(answer, defaultReps);
   }
 
   function skipRest() {
@@ -1138,32 +1179,67 @@
     }
 
     var completed = completedSetCount(item);
-    var sets = askForNumber("Target sets?", item.sets, 1, 12);
-    if (sets === null) {
-      return;
-    }
-    if (sets < completed) {
-      sets = completed;
-      showToast("Target sets clamped to completed sets.");
-    }
-    var target = askForNumber(item.type === "time" ? "Target seconds?" : "Target reps?", item.target, 1, 300);
-    if (target === null) {
-      return;
-    }
-    var restSeconds = askForNumber("Rest seconds?", item.restSeconds, 1, 600);
-    if (restSeconds === null) {
-      return;
-    }
-
-    item.sets = sets;
-    item.target = target;
-    item.restSeconds = restSeconds;
-    if (workout.currentItemId === itemId && workout.setNumber > item.sets) {
-      workout.setNumber = item.sets;
-    }
-    persistActiveWorkout().then(function () {
-      renderPlayer();
-      showToast("Active workout plan updated.");
+    numberDialog({
+      title: "Edit " + item.name,
+      message: completed ? completed + " completed sets will be preserved." : "Update the pending plan for this exercise.",
+      label: "Target sets",
+      value: item.sets,
+      min: 1,
+      max: 12,
+      confirmText: "Next"
+    }).then(function (sets) {
+      if (sets === null) {
+        return null;
+      }
+      if (sets < completed) {
+        sets = completed;
+        showToast("Target sets clamped to completed sets.");
+      }
+      return numberDialog({
+        title: "Edit " + item.name,
+        message: "Set the " + (item.type === "time" ? "seconds" : "reps") + " target.",
+        label: item.type === "time" ? "Target seconds" : "Target reps",
+        value: item.target,
+        min: 1,
+        max: 300,
+        confirmText: "Next"
+      }).then(function (target) {
+        if (target === null) {
+          return null;
+        }
+        return numberDialog({
+          title: "Edit " + item.name,
+          message: "Set rest after each set.",
+          label: "Rest seconds",
+          value: item.restSeconds,
+          min: 1,
+          max: 600,
+          confirmText: "Save"
+        }).then(function (restSeconds) {
+          if (restSeconds === null) {
+            return null;
+          }
+          return {
+            sets: sets,
+            target: target,
+            restSeconds: restSeconds
+          };
+        });
+      });
+    }).then(function (values) {
+      if (!values) {
+        return;
+      }
+      item.sets = values.sets;
+      item.target = values.target;
+      item.restSeconds = values.restSeconds;
+      if (workout.currentItemId === itemId && workout.setNumber > item.sets) {
+        workout.setNumber = item.sets;
+      }
+      persistActiveWorkout().then(function () {
+        renderPlayer();
+        showToast("Active workout plan updated.");
+      });
     });
   }
 
@@ -1182,13 +1258,25 @@
       showToast("Finish the active set before removing this exercise.");
       return;
     }
-    if (completed > 0 && !window.confirm("Remove this partially completed exercise from the remaining plan? Completed set logs will stay saved.")) {
-      return;
-    }
+    confirmRemoveActiveWorkoutItem(workout, item, itemId, completed);
+  }
 
-    workout.exercises = workout.exercises.filter(function (plan) {
-      return plan.itemId !== itemId;
-    });
+  function confirmRemoveActiveWorkoutItem(workout, item, itemId, completed) {
+    var confirmation = completed > 0 ? confirmDialog({
+      title: "Remove pending exercise?",
+      message: "Remove this partially completed exercise from the remaining plan? Completed set logs will stay saved.",
+      confirmText: "Remove",
+      danger: true
+    }) : Promise.resolve(true);
+
+    confirmation.then(function (confirmed) {
+      if (!confirmed) {
+        return;
+      }
+
+      workout.exercises = workout.exercises.filter(function (plan) {
+        return plan.itemId !== itemId;
+      });
     workout.exercises.sort(function (a, b) {
       return a.order - b.order;
     }).forEach(function (plan, index) {
@@ -1217,15 +1305,7 @@
       renderPlayer();
       showToast("Exercise removed from active workout.");
     });
-  }
-
-  function askForNumber(message, currentValue, min, max) {
-    var answer = window.prompt(message, String(currentValue));
-    if (answer === null) {
-      return null;
-    }
-    var parsed = cleanNumber(answer, currentValue);
-    return clamp(parsed, min, max);
+    });
   }
 
   function renderLiveSetLog(workout) {
@@ -1268,25 +1348,173 @@
         "<span><strong>" + formatDateTime(session.startedAt) + "</strong><small>" +
         session.selectedExercises.map(function (item) { return item.name; }).join(", ") +
         "</small></span>" +
-        "<span>" + formatTime(session.totalDurationSeconds) + " · " +
+        '<span class="session-summary-meta">' + formatTime(session.totalDurationSeconds) + " · " +
         session.completedSets.length + " sets · " + totalReps + " reps</span>" +
         "</summary>";
+      var sessionActions = document.createElement("div");
+      sessionActions.className = "log-actions";
+      sessionActions.innerHTML =
+        '<button class="danger-btn small-btn" type="button">Remove Session</button>';
+      sessionActions.querySelector("button").addEventListener("click", function (event) {
+        event.preventDefault();
+        removeLoggedSession(session);
+      });
 
       var detailList = document.createElement("div");
       detailList.className = "session-detail";
+      detailList.appendChild(sessionActions);
       session.completedSets.forEach(function (set) {
         var row = document.createElement("div");
-        row.className = "set-row";
+        row.className = "set-row log-set-row";
         var amount = set.type === "time" ? (set.target || set.setDurationSeconds) + "s" : set.reps + " reps";
         row.innerHTML =
+          '<div class="set-row-main">' +
           "<strong>" + escapeHtml(set.exerciseName) + " · Set " + set.setNumber + "</strong>" +
           "<span>" + amount +
           " · work " + formatTime(set.setDurationSeconds) +
-          " · rest " + formatTime(set.restDurationSeconds) + "</span>";
+          " · rest " + formatTime(set.restDurationSeconds) + "</span>" +
+          "</div>" +
+          '<div class="log-actions">' +
+          '<button class="ghost-btn small-btn" type="button" data-action="edit">Edit</button>' +
+          '<button class="danger-btn small-btn" type="button" data-action="remove">Remove</button>' +
+          "</div>";
+        row.querySelector('[data-action="edit"]').addEventListener("click", function () {
+          editLoggedSet(set);
+        });
+        row.querySelector('[data-action="remove"]').addEventListener("click", function () {
+          removeLoggedSet(set);
+        });
         detailList.appendChild(row);
       });
       details.appendChild(detailList);
       els.sessionList.appendChild(details);
+    });
+  }
+
+  function editLoggedSet(set) {
+    var firstInput = numberDialog({
+      title: "Edit log",
+      message: set.exerciseName + " · Set " + set.setNumber,
+      label: set.type === "time" ? "Actual duration seconds" : "Actual reps",
+      value: set.type === "time" ? set.setDurationSeconds || set.target || 1 : set.reps || set.target || 1,
+      min: 1,
+      max: 999,
+      confirmText: "Next"
+    });
+
+    firstInput.then(function (amount) {
+      if (amount === null) {
+        return null;
+      }
+      if (set.type === "time") {
+        return editLoggedSetRest(set, Object.assign({}, set, {
+          reps: null,
+          setDurationSeconds: amount
+        }));
+      }
+      return numberDialog({
+        title: "Edit log",
+        message: "Adjust work duration.",
+        label: "Work seconds",
+        value: set.setDurationSeconds || amount || 1,
+        min: 1,
+        max: 9999,
+        confirmText: "Next"
+      }).then(function (workSeconds) {
+        if (workSeconds === null) {
+          return null;
+        }
+        return numberDialog({
+          title: "Edit log",
+          message: "Adjust rest duration.",
+          label: "Rest seconds",
+          value: set.restDurationSeconds || 1,
+          min: 1,
+          max: 9999,
+          confirmText: "Save"
+        }).then(function (restSeconds) {
+          if (restSeconds === null) {
+            return null;
+          }
+          return Object.assign({}, set, {
+            reps: set.type === "reps" ? amount : null,
+            setDurationSeconds: workSeconds,
+            restDurationSeconds: restSeconds
+          });
+        });
+      });
+    }).then(function (updated) {
+      if (!updated) {
+        return;
+      }
+      WorkoutDb.updateSet(set.id, updated).then(function () {
+        return refreshSessions();
+      }).then(function () {
+        showToast("Log updated.");
+      }).catch(function () {
+        showToast("Log update failed.");
+        updateModeWarning();
+      });
+    });
+  }
+
+  function editLoggedSetRest(set, updated) {
+    return numberDialog({
+      title: "Edit log",
+      message: "Adjust rest duration.",
+      label: "Rest seconds",
+      value: set.restDurationSeconds || 1,
+      min: 1,
+      max: 9999,
+      confirmText: "Save"
+    }).then(function (restSeconds) {
+      if (restSeconds === null) {
+        return null;
+      }
+      updated.restDurationSeconds = restSeconds;
+      return updated;
+    });
+  }
+
+  function removeLoggedSet(set) {
+    confirmDialog({
+      title: "Remove set log?",
+      message: "Remove " + set.exerciseName + " set " + set.setNumber + " from the log?",
+      confirmText: "Remove",
+      danger: true
+    }).then(function (confirmed) {
+      if (!confirmed) {
+        return;
+      }
+      WorkoutDb.deleteSet(set.id).then(function () {
+        return refreshSessions();
+      }).then(function () {
+        showToast("Set log removed.");
+      }).catch(function () {
+        showToast("Set log remove failed.");
+        updateModeWarning();
+      });
+    });
+  }
+
+  function removeLoggedSession(session) {
+    confirmDialog({
+      title: "Remove workout log?",
+      message: "Remove this entire workout log and all of its set logs?",
+      confirmText: "Remove",
+      danger: true
+    }).then(function (confirmed) {
+      if (!confirmed) {
+        return;
+      }
+      WorkoutDb.deleteSession(session.id).then(function () {
+        return refreshSessions();
+      }).then(function () {
+        showToast("Workout log removed.");
+      }).catch(function () {
+        showToast("Workout log remove failed.");
+        updateModeWarning();
+      });
     });
   }
 
@@ -1392,24 +1620,31 @@
   }
 
   function resetDemoData() {
-    if (!window.confirm("Reset exercises, saved workouts, and active workout?")) {
-      return;
-    }
-    state.exercises = clone(WorkoutSeed.exercises);
-    state.sessions = [];
-    state.activeWorkout = null;
-    seedBuilderDefaults();
-    WorkoutDb.deleteAllData().then(function (exercises) {
-      state.exercises = exercises && exercises.length ? exercises : clone(WorkoutSeed.exercises);
+    confirmDialog({
+      title: "Reset demo data?",
+      message: "Reset exercises, saved workouts, and active workout?",
+      confirmText: "Reset",
+      danger: true
+    }).then(function (confirmed) {
+      if (!confirmed) {
+        return;
+      }
+      state.exercises = clone(WorkoutSeed.exercises);
       state.sessions = [];
       state.activeWorkout = null;
       seedBuilderDefaults();
-      return persistActiveWorkout();
-    }).then(function () {
-      renderAll();
-      updateModeWarning();
-      switchTab("library");
-      showToast("Demo data reset.");
+      WorkoutDb.deleteAllData().then(function (exercises) {
+        state.exercises = exercises && exercises.length ? exercises : clone(WorkoutSeed.exercises);
+        state.sessions = [];
+        state.activeWorkout = null;
+        seedBuilderDefaults();
+        return persistActiveWorkout();
+      }).then(function () {
+        renderAll();
+        updateModeWarning();
+        switchTab("library");
+        showToast("Demo data reset.");
+      });
     });
   }
 
@@ -1458,6 +1693,85 @@
       oscillator.stop(audio.currentTime + 0.18);
     } catch (error) {
       // Some browsers block audio until the user interacts. The timer still works.
+    }
+  }
+
+  function confirmDialog(options) {
+    return openAppDialog(Object.assign({
+      type: "confirm",
+      kicker: "Confirm",
+      confirmText: "OK",
+      cancelText: "Cancel"
+    }, options || {}));
+  }
+
+  function numberDialog(options) {
+    return openAppDialog(Object.assign({
+      type: "number",
+      kicker: "Input",
+      confirmText: "OK",
+      cancelText: "Cancel"
+    }, options || {}));
+  }
+
+  function openAppDialog(options) {
+    return new Promise(function (resolve) {
+      state.appDialogResolve = resolve;
+      state.appDialogOptions = options;
+      els.appDialogKicker.textContent = options.kicker || "Workout Watch";
+      els.appDialogTitle.textContent = options.title || "Confirm action";
+      els.appDialogMessage.textContent = options.message || "";
+      els.appDialogConfirmBtn.textContent = options.confirmText || "OK";
+      els.appDialogCancelBtn.textContent = options.cancelText || "Cancel";
+      els.appDialogConfirmBtn.className = options.danger ? "danger-btn" : "primary-btn";
+      els.appDialogInputRow.hidden = options.type !== "number";
+      if (options.type === "number") {
+        els.appDialogInputLabel.textContent = options.label || "Value";
+        els.appDialogInput.value = options.value || 1;
+        els.appDialogInput.min = options.min || 1;
+        els.appDialogInput.max = options.max || "";
+        els.appDialogInput.step = options.step || 1;
+      }
+      els.appDialog.hidden = false;
+      els.appDialog.classList.add("is-open");
+      document.body.classList.add("modal-open");
+      window.setTimeout(function () {
+        if (options.type === "number") {
+          els.appDialogInput.focus();
+          els.appDialogInput.select();
+        } else {
+          els.appDialogConfirmBtn.focus();
+        }
+      }, 0);
+    });
+  }
+
+  function submitAppDialog(event) {
+    event.preventDefault();
+    var options = state.appDialogOptions || {};
+    if (options.type === "number") {
+      closeAppDialog(clamp(cleanNumber(els.appDialogInput.value, options.value || 1), options.min || 1, options.max || 9999));
+      return;
+    }
+    closeAppDialog(true);
+  }
+
+  function cancelAppDialog() {
+    var options = state.appDialogOptions || {};
+    closeAppDialog(options.type === "number" ? null : false);
+  }
+
+  function closeAppDialog(value) {
+    var resolve = state.appDialogResolve;
+    state.appDialogResolve = null;
+    state.appDialogOptions = null;
+    els.appDialog.classList.remove("is-open");
+    els.appDialog.hidden = true;
+    if (els.exerciseModal.hidden) {
+      document.body.classList.remove("modal-open");
+    }
+    if (resolve) {
+      resolve(value);
     }
   }
 
