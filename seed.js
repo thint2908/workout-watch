@@ -334,7 +334,7 @@
     {
       id: "jump-rope-imaginary",
       name: "Jump rope imaginary",
-      bodyPart: "Full body",
+      bodyPart: "Cardio",
       type: "time",
       defaultSets: 4,
       defaultSeconds: 60,
@@ -345,7 +345,7 @@
     {
       id: "fast-feet",
       name: "Fast feet",
-      bodyPart: "Full body",
+      bodyPart: "Cardio",
       type: "time",
       defaultSets: 4,
       defaultSeconds: 30,
@@ -356,7 +356,7 @@
     {
       id: "skater-step",
       name: "Skater step",
-      bodyPart: "Full body",
+      bodyPart: "Cardio",
       type: "time",
       defaultSets: 4,
       defaultSeconds: 40,
@@ -367,7 +367,7 @@
     {
       id: "shadow-boxing",
       name: "Shadow boxing",
-      bodyPart: "Full body",
+      bodyPart: "Cardio",
       type: "time",
       defaultSets: 4,
       defaultSeconds: 60,
@@ -378,7 +378,7 @@
     {
       id: "burpee",
       name: "Burpee",
-      bodyPart: "Full body",
+      bodyPart: "Cardio",
       type: "reps",
       defaultSets: 4,
       defaultReps: 10,
@@ -389,7 +389,7 @@
     {
       id: "half-burpee",
       name: "Half burpee",
-      bodyPart: "Full body",
+      bodyPart: "Cardio",
       type: "reps",
       defaultSets: 4,
       defaultReps: 12,
@@ -400,7 +400,7 @@
     {
       id: "squat-pulse",
       name: "Squat pulse",
-      bodyPart: "Legs",
+      bodyPart: "Cardio",
       type: "time",
       defaultSets: 3,
       defaultSeconds: 40,
@@ -411,7 +411,7 @@
     {
       id: "jump-squat",
       name: "Jump squat",
-      bodyPart: "Legs",
+      bodyPart: "Cardio",
       type: "reps",
       defaultSets: 4,
       defaultReps: 10,
@@ -422,7 +422,7 @@
     {
       id: "lateral-shuffle",
       name: "Lateral shuffle",
-      bodyPart: "Full body",
+      bodyPart: "Cardio",
       type: "time",
       defaultSets: 4,
       defaultSeconds: 30,
@@ -433,7 +433,7 @@
     {
       id: "bear-crawl-hold",
       name: "Bear crawl hold",
-      bodyPart: "Core",
+      bodyPart: "Cardio",
       type: "time",
       defaultSets: 3,
       defaultSeconds: 30,
@@ -444,7 +444,7 @@
     {
       id: "bear-crawl-steps",
       name: "Bear crawl steps",
-      bodyPart: "Full body",
+      bodyPart: "Cardio",
       type: "time",
       defaultSets: 3,
       defaultSeconds: 30,
@@ -455,7 +455,7 @@
     {
       id: "plank-jack",
       name: "Plank jack",
-      bodyPart: "Core",
+      bodyPart: "Cardio",
       type: "time",
       defaultSets: 3,
       defaultSeconds: 30,
@@ -466,7 +466,7 @@
     {
       id: "toe-taps",
       name: "Toe taps",
-      bodyPart: "Full body",
+      bodyPart: "Cardio",
       type: "time",
       defaultSets: 4,
       defaultSeconds: 45,
@@ -477,7 +477,7 @@
     {
       id: "step-up-on-chair",
       name: "Step-up on chair",
-      bodyPart: "Legs",
+      bodyPart: "Cardio",
       type: "reps",
       defaultSets: 3,
       defaultReps: 12,
@@ -488,7 +488,7 @@
     {
       id: "sprint-in-place",
       name: "Sprint in place",
-      bodyPart: "Full body",
+      bodyPart: "Cardio",
       type: "time",
       defaultSets: 5,
       defaultSeconds: 20,
@@ -499,7 +499,7 @@
     {
       id: "tabata-mountain-climber",
       name: "Tabata mountain climber",
-      bodyPart: "Full body",
+      bodyPart: "Cardio",
       type: "time",
       defaultSets: 8,
       defaultSeconds: 20,

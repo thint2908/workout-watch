@@ -329,6 +329,7 @@
       missingSeedExercises(exercises).forEach(function (exercise) {
         exercises.push(Object.assign({}, exercise, { id: exercise.id || localId("exercise") }));
       });
+      exercises = syncLocalSeedExercises(exercises);
       localSet("exercises", exercises);
     }
     return Promise.resolve(exercises);
@@ -341,6 +342,9 @@
       }
       if (missingSeedExercises(rows).length) {
         return seedExercises().then(listExercises);
+      }
+      if (seedExerciseUpdates(rows).length) {
+        return syncSeedExerciseUpdates(rows).then(listExercises);
       }
       var exercises = rows.map(dbToExercise);
       localSet("exercises", exercises);
@@ -377,6 +381,57 @@
     });
     return window.WorkoutSeed.exercises.filter(function (exercise) {
       return !existingNames[String(exercise.name || "").trim().toLowerCase()];
+    });
+  }
+
+  function seedExerciseMap() {
+    var map = {};
+    window.WorkoutSeed.exercises.forEach(function (exercise) {
+      map[String(exercise.name || "").trim().toLowerCase()] = exercise;
+    });
+    return map;
+  }
+
+  function seedExerciseUpdates(rows) {
+    var map = seedExerciseMap();
+    return rows.filter(function (row) {
+      var seed = map[String(row.name || "").trim().toLowerCase()];
+      return seed && needsSeedExerciseUpdate(row, seed);
+    }).map(function (row) {
+      return {
+        id: row.id,
+        exercise: map[String(row.name || "").trim().toLowerCase()]
+      };
+    });
+  }
+
+  function needsSeedExerciseUpdate(row, seed) {
+    return row.body_part !== seed.bodyPart ||
+      row.type !== seed.type ||
+      cleanNumber(row.default_sets, 0) !== cleanNumber(seed.defaultSets, 0) ||
+      cleanNumber(row.default_reps, 0) !== (seed.type === "reps" ? cleanNumber(seed.defaultReps, 0) : 0) ||
+      cleanNumber(row.default_seconds, 0) !== (seed.type === "time" ? defaultTarget(seed) : 0) ||
+      cleanNumber(row.default_rest_seconds, 0) !== cleanNumber(seed.defaultRestSeconds, 0) ||
+      (row.difficulty || "normal") !== (seed.difficulty || "normal") ||
+      (row.note || "") !== (seed.note || "");
+  }
+
+  function syncSeedExerciseUpdates(rows) {
+    var updates = seedExerciseUpdates(rows);
+    return Promise.all(updates.map(function (update) {
+      return request("exercises?id=eq." + encodeURIComponent(update.id), {
+        method: "PATCH",
+        headers: headers({ Prefer: "return=minimal" }),
+        body: JSON.stringify(seedToDbExercise(update.exercise))
+      });
+    }));
+  }
+
+  function syncLocalSeedExercises(exercises) {
+    var map = seedExerciseMap();
+    return exercises.map(function (exercise) {
+      var seed = map[String(exercise.name || "").trim().toLowerCase()];
+      return seed ? Object.assign({}, exercise, seed, { id: exercise.id }) : exercise;
     });
   }
 
