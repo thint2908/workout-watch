@@ -109,6 +109,7 @@
     els.signOutBtn = document.getElementById("signOutBtn");
     els.exportBtn = document.getElementById("exportBtn");
     els.importFile = document.getElementById("importFile");
+    els.syncLocalBtn = document.getElementById("syncLocalBtn");
     els.resetBtn = document.getElementById("resetBtn");
     els.appDialog = document.getElementById("appDialog");
     els.appDialogForm = document.getElementById("appDialogForm");
@@ -155,6 +156,7 @@
     els.finishWorkoutBtn.addEventListener("click", finishWorkout);
     els.exportBtn.addEventListener("click", exportJson);
     els.importFile.addEventListener("change", importJson);
+    els.syncLocalBtn.addEventListener("click", syncLocalLogs);
     els.resetBtn.addEventListener("click", resetDemoData);
     els.appDialogForm.addEventListener("submit", submitAppDialog);
     els.appDialogCancelBtn.addEventListener("click", cancelAppDialog);
@@ -1671,7 +1673,7 @@
           seedBuilderDefaults();
           renderAll();
           updateModeWarning();
-          showToast("Backup imported.");
+          showToast("Backup imported. Use Sync Local Logs to upload imported sessions.");
         });
       } catch (error) {
         showToast("Import failed. Choose a valid JSON backup.");
@@ -1679,6 +1681,24 @@
       event.target.value = "";
     };
     reader.readAsText(file);
+  }
+
+  function syncLocalLogs() {
+    els.syncLocalBtn.disabled = true;
+    WorkoutDb.syncLocalSessions().then(function (result) {
+      return refreshSessions().then(function () {
+        if (!result.total) {
+          showToast("No local logs to sync.");
+          return;
+        }
+        showToast("Synced " + result.synced + " local log" + (result.synced === 1 ? "" : "s") + ".");
+      });
+    }).catch(function () {
+      showToast("Local log sync failed. Check Supabase connection.");
+      updateModeWarning();
+    }).finally(function () {
+      els.syncLocalBtn.disabled = false;
+    });
   }
 
   function resetDemoData() {

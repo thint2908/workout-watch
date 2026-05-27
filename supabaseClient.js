@@ -210,6 +210,10 @@
     return value;
   }
 
+  function localRemove(key) {
+    localStorage.removeItem(LOCAL_PREFIX + key);
+  }
+
   function localId(prefix) {
     if (window.crypto && crypto.randomUUID) {
       return crypto.randomUUID();
@@ -264,6 +268,20 @@
     return {
       session_id: set.sessionId,
       exercise_id: set.exerciseId,
+      exercise_name: set.exerciseName,
+      set_number: set.setNumber,
+      target_reps: set.type === "reps" ? set.target : null,
+      actual_reps: set.type === "reps" ? set.reps : null,
+      target_seconds: set.type === "time" ? set.target : null,
+      actual_duration_seconds: set.setDurationSeconds,
+      rest_seconds: set.restDurationSeconds
+    };
+  }
+
+  function setToSyncDb(set, remoteSessionId, exerciseId) {
+    return {
+      session_id: remoteSessionId,
+      exercise_id: exerciseId || null,
       exercise_name: set.exerciseName,
       set_number: set.setNumber,
       target_reps: set.type === "reps" ? set.target : null,
@@ -543,6 +561,7 @@
       };
       sessions.unshift(session);
       localSet("sessions", sessions);
+      upsertPendingSession(session);
       return { id: session.id, started_at: startedAt };
     });
   }
@@ -689,6 +708,7 @@
       session.selectedExercises = selectedExercises || [];
       session.completedSets = completedSets || [];
       localSet("sessions", sessions);
+      upsertPendingSession(session);
       return session;
     });
   }
@@ -704,6 +724,136 @@
       }
       return Promise.resolve(localGet("sessions", []));
     });
+  }
+
+  function upsertPendingSession(session) {
+    var pending = localGet("pendingSessions", []);
+    var index = pending.findIndex(function (item) {
+      return item.id === session.id;
+    });
+    if (index >= 0) {
+      pending[index] = session;
+    } else {
+      pending.unshift(session);
+    }
+    localSet("pendingSessions", pending);
+  }
+
+  function localSyncCandidates() {
+    var byKey = {};
+    localGet("sessions", []).concat(localGet("pendingSessions", [])).forEach(function (session) {
+      if (!session || !session.startedAt || !Array.isArray(session.completedSets) || !session.completedSets.length) {
+        return;
+      }
+      byKey[sessionSignature(session)] = session;
+    });
+    return Object.keys(byKey).map(function (key) {
+      return byKey[key];
+    });
+  }
+
+  function sessionSignature(session) {
+    return [
+      session.startedAt || "",
+      session.finishedAt || "",
+      session.completedSets ? session.completedSets.length : 0,
+      session.totalDurationSeconds || 0
+    ].join("|");
+  }
+
+  function syncLocalSessions() {
+    if (!isAuthenticated()) {
+      return Promise.reject(new Error("Sign in required."));
+    }
+    var candidates = localSyncCandidates();
+    if (!candidates.length) {
+      return Promise.resolve({ total: 0, synced: 0, skipped: 0 });
+    }
+
+    return Promise.all([
+      request("workout_sessions?select=*,workout_sets(*)&order=started_at.desc"),
+      request("exercises?select=id,name")
+    ]).then(function (values) {
+      var remoteSessions = values[0].map(dbToSession);
+      var exerciseMap = {};
+      values[1].forEach(function (exercise) {
+        exerciseMap[String(exercise.name || "").trim().toLowerCase()] = exercise.id;
+      });
+
+      var synced = 0;
+      var skipped = 0;
+      var syncedSignatures = [];
+      var chain = Promise.resolve();
+      candidates.forEach(function (localSession) {
+        chain = chain.then(function () {
+          if (hasRemoteSession(remoteSessions, localSession)) {
+            skipped += 1;
+            syncedSignatures.push(sessionSignature(localSession));
+            return null;
+          }
+          return uploadLocalSession(localSession, exerciseMap).then(function () {
+            synced += 1;
+            syncedSignatures.push(sessionSignature(localSession));
+          });
+        });
+      });
+
+      return chain.then(function () {
+        removePendingSessionSignatures(syncedSignatures);
+        return {
+          total: candidates.length,
+          synced: synced,
+          skipped: skipped
+        };
+      });
+    });
+  }
+
+  function hasRemoteSession(remoteSessions, localSession) {
+    return remoteSessions.some(function (remoteSession) {
+      return sessionSignature(remoteSession) === sessionSignature(localSession);
+    });
+  }
+
+  function uploadLocalSession(localSession, exerciseMap) {
+    return request("workout_sessions", {
+      method: "POST",
+      headers: headers({ Prefer: "return=representation" }),
+      body: JSON.stringify({
+        started_at: localSession.startedAt,
+        finished_at: localSession.finishedAt || null,
+        total_duration_seconds: localSession.totalDurationSeconds || 0
+      })
+    }).then(function (rows) {
+      var remoteSessionId = rows[0].id;
+      var sets = (localSession.completedSets || []).map(function (set) {
+        var exerciseId = exerciseMap[String(set.exerciseName || "").trim().toLowerCase()] || null;
+        return setToSyncDb(set, remoteSessionId, exerciseId);
+      });
+      if (!sets.length) {
+        return null;
+      }
+      return request("workout_sets", {
+        method: "POST",
+        headers: headers({ Prefer: "return=minimal" }),
+        body: JSON.stringify(sets)
+      });
+    });
+  }
+
+  function removePendingSessionSignatures(signatures) {
+    var signatureMap = {};
+    signatures.forEach(function (signature) {
+      signatureMap[signature] = true;
+    });
+    var pending = localGet("pendingSessions", []).filter(function (session) {
+      return !signatureMap[sessionSignature(session)];
+    });
+    if (pending.length) {
+      localSet("pendingSessions", pending);
+    } else {
+      localRemove("pendingSessions");
+    }
   }
 
   function saveActiveWorkout(workout) {
@@ -753,6 +903,7 @@
   function importData(data) {
     localSet("exercises", Array.isArray(data.exercises) ? data.exercises : window.WorkoutSeed.exercises);
     localSet("sessions", Array.isArray(data.sessions) ? data.sessions : []);
+    localSet("pendingSessions", Array.isArray(data.sessions) ? data.sessions : []);
     if (data.activeWorkout) {
       localSet("activeWorkout", data.activeWorkout);
     }
@@ -775,6 +926,7 @@
     deleteSession: deleteSession,
     finishSession: finishSession,
     listSessions: listSessions,
+    syncLocalSessions: syncLocalSessions,
     saveActiveWorkout: saveActiveWorkout,
     getActiveWorkout: getActiveWorkout,
     deleteAllData: deleteAllData,

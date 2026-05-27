@@ -19,6 +19,7 @@ A GitHub Pages friendly calisthenics workout tracker built with HTML, CSS, and v
 - Offline/local mode fallback after the owner is signed in.
 - Active workout restore after page refresh.
 - JSON export and import for backups.
+- Local log sync for uploading offline/imported workout logs to Supabase.
 - Reset demo data button.
 
 ## Files
@@ -94,3 +95,5 @@ Push these files to a GitHub repository and enable GitHub Pages for the branch t
 ## Data
 
 Workout data is saved to Supabase after the owner signs in. If Supabase cannot be reached after sign-in, the app shows **Offline/local mode** and temporarily uses localStorage in the current browser profile. Use **Export JSON** for backups.
+
+If a workout was completed while the app was in **Offline/local mode**, click **Sync Local Logs** after Supabase is reachable again. If the workout was completed from a local `file://` copy and you later open the hosted website, browser storage is separate; use **Export JSON** from the local copy, **Import JSON** on the hosted website, then click **Sync Local Logs** to upload those sessions to Supabase.

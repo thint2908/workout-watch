@@ -33,6 +33,7 @@ body:not(.is-authenticated) .tabs,
 body:not(.is-authenticated) main,
 body:not(.is-authenticated) #exportBtn,
 body:not(.is-authenticated) .import-label,
+body:not(.is-authenticated) #syncLocalBtn,
 body:not(.is-authenticated) #resetBtn {
   display: none;
 }
