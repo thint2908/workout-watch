@@ -4,7 +4,7 @@ A GitHub Pages friendly calisthenics workout tracker built with HTML, CSS, and v
 
 ## Features
 
-- Beginner exercise library grouped by body part.
+- Default home calisthenics exercise library with 29 upper body, arms, back, core, legs, and full-body movements.
 - Workout builder with editable sets, reps or seconds, and rest time.
 - Active workout editing: add more exercises, adjust pending targets, remove unfinished exercises, and reorder the active plan without restarting the session.
 - Intelligent default rest suggestions:
@@ -25,7 +25,7 @@ A GitHub Pages friendly calisthenics workout tracker built with HTML, CSS, and v
 
 - `index.html` - static page structure.
 - `style.css` - mobile-first dark UI.
-- `seed.js` - seeded body parts and exercises.
+- `seed.js` - seeded body parts and the default home calisthenics exercise library.
 - `config.js` - local Supabase URL and public anon key.
 - `config.example.js` - config template.
 - `supabaseClient.js` - Supabase REST client with localStorage fallback.

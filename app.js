@@ -243,10 +243,16 @@
       state.builder[exercise.id] = {
         selected: state.builder[exercise.id] ? state.builder[exercise.id].selected : false,
         sets: state.builder[exercise.id] ? state.builder[exercise.id].sets : exercise.defaultSets,
-        target: state.builder[exercise.id] ? state.builder[exercise.id].target : exercise.defaultReps,
+        target: state.builder[exercise.id] ? state.builder[exercise.id].target : defaultTarget(exercise),
         restSeconds: state.builder[exercise.id] ? state.builder[exercise.id].restSeconds : suggestedRest(exercise)
       };
     });
+  }
+
+  function defaultTarget(exercise) {
+    return exercise.type === "time" ?
+      cleanNumber(exercise.defaultSeconds, exercise.defaultReps || 30) :
+      cleanNumber(exercise.defaultReps, 8);
   }
 
   // Rest suggestions stay simple and transparent so beginners can adjust them.
@@ -312,7 +318,7 @@
         item.innerHTML =
           "<strong>" + escapeHtml(exercise.name) + "</strong>" +
           "<span>" + exercise.defaultSets + " sets · " +
-          targetLabel(exercise, exercise.defaultReps) + " · " +
+          targetLabel(exercise, defaultTarget(exercise)) + " · " +
           exercise.defaultRestSeconds + "s rest</span>" +
           "<p>" + escapeHtml(exercise.note) + "</p>";
         list.appendChild(item);
@@ -357,7 +363,7 @@
         state.builder[exercise.id] = {
           selected: false,
           sets: exercise.defaultSets,
-          target: exercise.defaultReps,
+          target: defaultTarget(exercise),
           restSeconds: suggestedRest(exercise)
         };
       }
@@ -405,7 +411,8 @@
       bodyPart: els.exerciseBodyPartInput.value,
       type: type,
       defaultSets: cleanNumber(els.exerciseSetsInput.value, 3),
-      defaultReps: target,
+      defaultReps: type === "reps" ? target : null,
+      defaultSeconds: type === "time" ? target : null,
       defaultRestSeconds: cleanNumber(els.exerciseRestInput.value, 60),
       difficulty: els.exerciseDifficultyInput.value,
       note: els.exerciseNoteInput.value.trim()
@@ -441,7 +448,7 @@
       state.builder[saved.id] = {
         selected: state.builder[saved.id] ? state.builder[saved.id].selected : false,
         sets: saved.defaultSets,
-        target: saved.defaultReps,
+        target: defaultTarget(saved),
         restSeconds: suggestedRest(saved)
       };
       resetExerciseForm();
@@ -472,7 +479,7 @@
     els.exerciseBodyPartInput.value = exercise.bodyPart;
     els.exerciseTypeInput.value = exercise.type;
     els.exerciseSetsInput.value = exercise.defaultSets;
-    els.exerciseTargetInput.value = exercise.defaultReps;
+    els.exerciseTargetInput.value = defaultTarget(exercise);
     els.exerciseRestInput.value = exercise.defaultRestSeconds;
     els.exerciseDifficultyInput.value = exercise.difficulty || "normal";
     els.exerciseNoteInput.value = exercise.note || "";
@@ -625,7 +632,7 @@
       bodyPart: exercise.bodyPart,
       type: exercise.type,
       sets: cleanNumber(config.sets, exercise.defaultSets || 1),
-      target: cleanNumber(config.target, exercise.defaultReps || 1),
+      target: cleanNumber(config.target, defaultTarget(exercise) || 1),
       restSeconds: cleanNumber(config.restSeconds, suggestedRest(exercise)),
       order: order
     };

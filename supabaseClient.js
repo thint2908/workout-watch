@@ -117,6 +117,12 @@
     return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
   }
 
+  function defaultTarget(exercise) {
+    return exercise.type === "time" ?
+      cleanNumber(exercise.defaultSeconds, exercise.defaultReps || 30) :
+      cleanNumber(exercise.defaultReps, 8);
+  }
+
   function getUser() {
     if (!session || !session.access_token) {
       return Promise.resolve(null);
@@ -218,7 +224,7 @@
       type: exercise.type,
       default_sets: exercise.defaultSets,
       default_reps: exercise.type === "reps" ? exercise.defaultReps : null,
-      default_seconds: exercise.type === "time" ? exercise.defaultReps : null,
+      default_seconds: exercise.type === "time" ? defaultTarget(exercise) : null,
       default_rest_seconds: exercise.defaultRestSeconds,
       difficulty: exercise.difficulty || "normal",
       note: exercise.note || ""
@@ -232,7 +238,7 @@
       type: exercise.type,
       default_sets: exercise.defaultSets,
       default_reps: exercise.type === "reps" ? exercise.defaultReps : null,
-      default_seconds: exercise.type === "time" ? exercise.defaultReps : null,
+      default_seconds: exercise.type === "time" ? defaultTarget(exercise) : null,
       default_rest_seconds: exercise.defaultRestSeconds,
       difficulty: exercise.difficulty || "normal",
       note: exercise.note || ""
@@ -246,6 +252,7 @@
       bodyPart: row.body_part,
       defaultSets: row.default_sets || 3,
       defaultReps: row.type === "time" ? row.default_seconds : row.default_reps,
+      defaultSeconds: row.type === "time" ? row.default_seconds : null,
       defaultRestSeconds: row.default_rest_seconds || 60,
       type: row.type,
       difficulty: row.difficulty || "normal",
@@ -318,6 +325,11 @@
         return Object.assign({}, exercise, { id: exercise.id || localId("exercise") });
       });
       localSet("exercises", exercises);
+    } else {
+      missingSeedExercises(exercises).forEach(function (exercise) {
+        exercises.push(Object.assign({}, exercise, { id: exercise.id || localId("exercise") }));
+      });
+      localSet("exercises", exercises);
     }
     return Promise.resolve(exercises);
   }
@@ -327,6 +339,9 @@
       if (!rows.length) {
         return seedExercises().then(listExercises);
       }
+      if (missingSeedExercises(rows).length) {
+        return seedExercises().then(listExercises);
+      }
       var exercises = rows.map(dbToExercise);
       localSet("exercises", exercises);
       return exercises;
@@ -334,6 +349,38 @@
   }
 
   function seedExercises() {
+    return request("exercises?select=name").then(function (rows) {
+      return missingSeedExercises(rows);
+    }).then(function (missingExercises) {
+      if (!missingExercises.length) {
+        return [];
+      }
+      return request("exercises", {
+        method: "POST",
+        headers: headers({ Prefer: "return=representation" }),
+        body: JSON.stringify(missingExercises.map(seedToDbExercise))
+      }).then(function (rows) {
+        return rows.map(dbToExercise);
+      });
+    }).catch(function () {
+      if (!isAuthenticated()) {
+        return Promise.reject(new Error("Sign in required."));
+      }
+      return localExercises();
+    });
+  }
+
+  function missingSeedExercises(rows) {
+    var existingNames = {};
+    rows.forEach(function (row) {
+      existingNames[String(row.name || "").trim().toLowerCase()] = true;
+    });
+    return window.WorkoutSeed.exercises.filter(function (exercise) {
+      return !existingNames[String(exercise.name || "").trim().toLowerCase()];
+    });
+  }
+
+  function seedAllExercises() {
     return request("exercises", {
       method: "POST",
       headers: headers({ Prefer: "return=representation" }),
@@ -623,7 +670,7 @@
     }).then(function () {
       return request("exercises?id=not.is.null", { method: "DELETE" });
     }).then(function () {
-      return seedExercises();
+      return seedAllExercises();
     }).catch(function () {
       if (!isAuthenticated()) {
         return Promise.reject(new Error("Sign in required."));
