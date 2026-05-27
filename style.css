@@ -443,6 +443,31 @@ td small,
   display: none;
 }
 
+.builder-eta {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.builder-eta span,
+.builder-eta small {
+  color: var(--muted);
+  font-size: 0.88rem;
+  font-weight: 800;
+}
+
+.builder-eta strong {
+  color: var(--primary);
+  font-variant-numeric: tabular-nums;
+  font-size: 1.2rem;
+}
+
 .chip-row {
   display: flex;
   flex-wrap: wrap;
@@ -787,6 +812,11 @@ th {
     min-height: 44px;
     padding: 8px 4px;
     font-size: 0.82rem;
+  }
+
+  .builder-eta {
+    grid-template-columns: 1fr;
+    gap: 2px;
   }
 
   .workout-state,

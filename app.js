@@ -77,6 +77,7 @@
     els.startWorkoutBtn = document.getElementById("startWorkoutBtn");
     els.discardWorkoutBtn = document.getElementById("discardWorkoutBtn");
     els.builderNotice = document.getElementById("builderNotice");
+    els.builderEta = document.getElementById("builderEta");
     els.playerTitle = document.getElementById("playerTitle");
     els.elapsedTime = document.getElementById("elapsedTime");
     els.durationProgress = document.getElementById("durationProgress");
@@ -382,15 +383,19 @@
       var buttons = row.querySelectorAll("button");
       inputs[0].addEventListener("change", function (event) {
         config.selected = event.target.checked;
+        renderBuilderEta();
       });
       inputs[1].addEventListener("input", function (event) {
         config.sets = cleanNumber(event.target.value, 1);
+        renderBuilderEta();
       });
       inputs[2].addEventListener("input", function (event) {
         config.target = cleanNumber(event.target.value, 1);
+        renderBuilderEta();
       });
       inputs[3].addEventListener("input", function (event) {
         config.restSeconds = cleanNumber(event.target.value, 15);
+        renderBuilderEta();
       });
       buttons[0].addEventListener("click", function () {
         editExercise(exercise.id);
@@ -401,6 +406,37 @@
 
       els.builderRows.appendChild(row);
     });
+    renderBuilderEta();
+  }
+
+  function renderBuilderEta() {
+    var summary = selectedBuilderSummary();
+    var etaText = formatTime(summary.seconds);
+    els.builderEta.querySelector("strong").textContent = etaText;
+    els.builderEta.querySelector("small").textContent =
+      summary.count + " exercise" + (summary.count === 1 ? "" : "s") +
+      " selected · " + summary.sets + " set" + (summary.sets === 1 ? "" : "s");
+  }
+
+  function selectedBuilderSummary() {
+    return state.exercises.reduce(function (summary, exercise) {
+      var config = state.builder[exercise.id];
+      if (!config || !config.selected) {
+        return summary;
+      }
+      var sets = cleanNumber(config.sets, exercise.defaultSets || 1);
+      summary.count += 1;
+      summary.sets += sets;
+      summary.seconds += estimateExerciseSeconds(exercise, config, sets);
+      return summary;
+    }, { count: 0, sets: 0, seconds: 0 });
+  }
+
+  function estimateExerciseSeconds(exercise, config, sets) {
+    var target = cleanNumber(config.target, defaultTarget(exercise));
+    var restSeconds = cleanNumber(config.restSeconds, suggestedRest(exercise));
+    var workSeconds = exercise.type === "time" ? target : Math.max(10, target * 3);
+    return sets * workSeconds + Math.max(0, sets - 1) * restSeconds;
   }
 
   function exerciseFromForm() {
