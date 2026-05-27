@@ -389,6 +389,20 @@ td small,
   font-weight: 800;
 }
 
+.builder-notice {
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border: 1px solid rgba(91, 182, 255, 0.45);
+  border-radius: 8px;
+  background: rgba(91, 182, 255, 0.12);
+  color: #d9efff;
+  font-weight: 800;
+}
+
+.builder-notice[hidden] {
+  display: none;
+}
+
 .chip-row {
   display: flex;
   flex-wrap: wrap;
@@ -546,6 +560,61 @@ th {
   margin-top: 18px;
 }
 
+.active-plan {
+  margin-top: 18px;
+}
+
+.active-plan-list {
+  display: grid;
+  gap: 8px;
+}
+
+.active-plan-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-2);
+}
+
+.active-plan-row.current {
+  border-color: var(--primary);
+  background: rgba(68, 209, 122, 0.12);
+}
+
+.active-plan-main {
+  display: flex;
+  min-width: 0;
+  gap: 10px;
+  align-items: center;
+}
+
+.active-plan-main strong,
+.active-plan-main small {
+  overflow-wrap: anywhere;
+}
+
+.order-badge {
+  display: inline-grid;
+  flex: 0 0 34px;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #111615;
+  color: var(--primary);
+  font-weight: 900;
+}
+
+.active-plan-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 .set-list {
   display: grid;
   gap: 8px;
@@ -664,6 +733,16 @@ th {
   .form-grid,
   .big-actions {
     grid-template-columns: 1fr;
+  }
+
+  .active-plan-row {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .active-plan-actions {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
   }
 
   .form-heading {

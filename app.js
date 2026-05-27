@@ -40,6 +40,7 @@
       state.exercises = records[0].length ? records[0] : clone(WorkoutSeed.exercises);
       state.sessions = records[1] || [];
       state.activeWorkout = records[2];
+      normalizeActiveWorkout();
       state.selectedBodyParts = clone(WorkoutSeed.bodyParts);
       seedBuilderDefaults();
       renderAll();
@@ -74,6 +75,8 @@
     els.saveExerciseBtn = document.getElementById("saveExerciseBtn");
     els.cancelEditBtn = document.getElementById("cancelEditBtn");
     els.startWorkoutBtn = document.getElementById("startWorkoutBtn");
+    els.discardWorkoutBtn = document.getElementById("discardWorkoutBtn");
+    els.builderNotice = document.getElementById("builderNotice");
     els.playerTitle = document.getElementById("playerTitle");
     els.elapsedTime = document.getElementById("elapsedTime");
     els.durationProgress = document.getElementById("durationProgress");
@@ -87,6 +90,7 @@
     els.skipRestBtn = document.getElementById("skipRestBtn");
     els.finishExerciseBtn = document.getElementById("finishExerciseBtn");
     els.finishWorkoutBtn = document.getElementById("finishWorkoutBtn");
+    els.activeWorkoutPlan = document.getElementById("activeWorkoutPlan");
     els.liveSetLog = document.getElementById("liveSetLog");
     els.sessionList = document.getElementById("sessionList");
     els.weeklyStats = document.getElementById("weeklyStats");
@@ -116,6 +120,7 @@
     els.authForm.addEventListener("submit", signInWithPassword);
     els.signOutBtn.addEventListener("click", signOut);
     els.startWorkoutBtn.addEventListener("click", startWorkout);
+    els.discardWorkoutBtn.addEventListener("click", discardWorkout);
     els.openExerciseEditorBtn.addEventListener("click", openNewExerciseModal);
     els.exerciseForm.addEventListener("submit", saveExerciseFromForm);
     els.cancelEditBtn.addEventListener("click", closeExerciseModal);
@@ -329,6 +334,10 @@
 
   function renderBuilder() {
     els.builderRows.innerHTML = "";
+    var hasActiveWorkout = Boolean(state.activeWorkout);
+    els.startWorkoutBtn.textContent = hasActiveWorkout ? "Add to Current Workout" : "Start Workout";
+    els.builderNotice.hidden = !hasActiveWorkout;
+    els.discardWorkoutBtn.hidden = !hasActiveWorkout;
     filteredExercises().forEach(function (exercise) {
       if (!state.builder[exercise.id]) {
         state.builder[exercise.id] = {
@@ -529,40 +538,34 @@
   }
 
   function startWorkout() {
-    // Copy the current builder values into the active workout. Later edits in
-    // the builder will not change a workout that is already running.
-    var selected = state.exercises.filter(function (exercise) {
-      return state.builder[exercise.id] && state.builder[exercise.id].selected;
-    }).map(function (exercise) {
-      var config = state.builder[exercise.id];
-      return {
-        id: exercise.id,
-        name: exercise.name,
-        bodyPart: exercise.bodyPart,
-        type: exercise.type,
-        sets: config.sets,
-        target: config.target,
-        restSeconds: config.restSeconds
-      };
-    });
+    var selected = selectedWorkoutItems();
 
     if (!selected.length) {
       showToast("Select at least one exercise.");
       return;
     }
 
+    if (state.activeWorkout) {
+      addSelectedToActiveWorkout(selected);
+      return;
+    }
+
     var startedAtMs = Date.now();
     els.startWorkoutBtn.disabled = true;
     WorkoutDb.createSession(new Date(startedAtMs).toISOString()).then(function (session) {
+      selected.forEach(function (item, index) {
+        item.order = index + 1;
+      });
       state.activeWorkout = {
         id: session.id,
         startedAt: startedAtMs,
         finishedAt: null,
         exercises: selected,
-        exerciseIndex: 0,
+        currentItemId: selected[0].itemId,
         setNumber: 1,
         status: "ready",
         setStartedAt: null,
+        setEndsAt: null,
         restStartedAt: null,
         restEndsAt: null,
         completedSets: []
@@ -572,6 +575,7 @@
     }).then(function () {
       els.startWorkoutBtn.disabled = false;
       updateModeWarning();
+      renderBuilder();
       renderPlayer();
       switchTab("player");
     }).catch(function () {
@@ -581,11 +585,141 @@
     });
   }
 
+  function selectedWorkoutItems() {
+    return state.exercises.filter(function (exercise) {
+      return state.builder[exercise.id] && state.builder[exercise.id].selected;
+    }).map(function (exercise) {
+      var config = state.builder[exercise.id];
+      return workoutItemFromExercise(exercise, config, 0);
+    });
+  }
+
+  function workoutItemFromExercise(exercise, config, order) {
+    return {
+      itemId: localItemId(exercise.id),
+      id: exercise.id,
+      name: exercise.name,
+      bodyPart: exercise.bodyPart,
+      type: exercise.type,
+      sets: cleanNumber(config.sets, exercise.defaultSets || 1),
+      target: cleanNumber(config.target, exercise.defaultReps || 1),
+      restSeconds: cleanNumber(config.restSeconds, suggestedRest(exercise)),
+      order: order
+    };
+  }
+
+  function localItemId(exerciseId) {
+    return exerciseId + "-" + Date.now() + "-" + Math.random().toString(16).slice(2);
+  }
+
+  function addSelectedToActiveWorkout(selected) {
+    var workout = state.activeWorkout;
+    var existingIds = {};
+    workout.exercises.forEach(function (item) {
+      existingIds[item.id] = true;
+    });
+    var nextOrder = maxOrder(workout.exercises) + 1;
+    var added = 0;
+    selected.forEach(function (item) {
+      if (existingIds[item.id]) {
+        return;
+      }
+      item.order = nextOrder;
+      nextOrder += 1;
+      workout.exercises.push(item);
+      added += 1;
+    });
+
+    if (!added) {
+      showToast("Selected exercises are already in the active workout.");
+      return;
+    }
+
+    if (!currentPlan() || workout.status === "exercise-complete") {
+      var next = sortedWorkoutItems().find(function (item) {
+        return !isExerciseComplete(item);
+      });
+      workout.currentItemId = next ? next.itemId : sortedWorkoutItems()[0].itemId;
+      workout.setNumber = 1;
+      workout.status = "ready";
+    }
+
+    persistActiveWorkout().then(function () {
+      renderBuilder();
+      renderPlayer();
+      switchTab("player");
+      showToast(added + " exercise" + (added === 1 ? "" : "s") + " added.");
+    });
+  }
+
+  function discardWorkout() {
+    if (!state.activeWorkout) {
+      return;
+    }
+    if (!window.confirm("Discard the current workout and start a new one? Saved set logs will remain in the log database.")) {
+      return;
+    }
+    state.activeWorkout = null;
+    persistActiveWorkout().then(function () {
+      renderBuilder();
+      renderPlayer();
+      showToast("Current workout discarded. Choose exercises and start again.");
+    });
+  }
+
+  function normalizeActiveWorkout() {
+    var workout = state.activeWorkout;
+    if (!workout || !Array.isArray(workout.exercises)) {
+      return;
+    }
+    workout.completedSets = Array.isArray(workout.completedSets) ? workout.completedSets : [];
+    workout.exercises.forEach(function (item, index) {
+      item.itemId = item.itemId || localItemId(item.id || "exercise");
+      item.order = cleanNumber(item.order, index + 1);
+      item.sets = cleanNumber(item.sets, 1);
+      item.target = cleanNumber(item.target, 1);
+      item.restSeconds = cleanNumber(item.restSeconds, 15);
+    });
+    workout.exercises.sort(function (a, b) {
+      return a.order - b.order;
+    });
+    workout.exercises.forEach(function (item, index) {
+      item.order = index + 1;
+    });
+    if (!workout.currentItemId) {
+      var legacy = workout.exercises[workout.exerciseIndex || 0] || workout.exercises[0];
+      workout.currentItemId = legacy ? legacy.itemId : null;
+    }
+    workout.setNumber = cleanNumber(workout.setNumber, 1);
+    var plan = currentPlan();
+    if (plan && workout.status === "working" && plan.type === "time" && !workout.setEndsAt && workout.setStartedAt) {
+      workout.setEndsAt = workout.setStartedAt + plan.target * 1000;
+    }
+  }
+
+  function sortedWorkoutItems() {
+    if (!state.activeWorkout) {
+      return [];
+    }
+    return state.activeWorkout.exercises.slice().sort(function (a, b) {
+      return a.order - b.order;
+    });
+  }
+
+  function maxOrder(items) {
+    return items.reduce(function (max, item) {
+      return Math.max(max, cleanNumber(item.order, 0));
+    }, 0);
+  }
+
   function currentPlan() {
     if (!state.activeWorkout) {
       return null;
     }
-    return state.activeWorkout.exercises[state.activeWorkout.exerciseIndex] || null;
+    var items = sortedWorkoutItems();
+    return items.find(function (item) {
+      return item.itemId === state.activeWorkout.currentItemId;
+    }) || items[0] || null;
   }
 
   function renderPlayer() {
@@ -600,6 +734,7 @@
       els.targetWork.textContent = "-";
       els.setTimer.textContent = "00:00";
       els.restTimer.textContent = "00:00";
+      renderActiveWorkoutPlan();
       els.liveSetLog.textContent = "No sets logged yet.";
       els.liveSetLog.classList.add("empty");
       setPlayerButtons(false);
@@ -613,8 +748,13 @@
     els.currentExercise.textContent = plan.name;
     els.currentSet.textContent = workout.setNumber + " of " + plan.sets;
     els.targetWork.textContent = targetLabel(plan, plan.target);
-    els.setTimer.textContent = workout.setStartedAt ? formatTime(secondsBetween(workout.setStartedAt, Date.now())) : "00:00";
+    if (workout.status === "working" && plan.type === "time") {
+      els.setTimer.textContent = formatTime(Math.max(0, secondsBetween(Date.now(), workout.setEndsAt)));
+    } else {
+      els.setTimer.textContent = workout.setStartedAt ? formatTime(secondsBetween(workout.setStartedAt, Date.now())) : "00:00";
+    }
     els.restTimer.textContent = workout.status === "resting" ? formatTime(Math.max(0, secondsBetween(Date.now(), workout.restEndsAt))) : "00:00";
+    renderActiveWorkoutPlan();
     renderLiveSetLog(workout);
     setPlayerButtons(true);
   }
@@ -630,26 +770,47 @@
   }
 
   function startSet() {
-    if (!state.activeWorkout || state.activeWorkout.status === "working") {
+    var workout = state.activeWorkout;
+    var plan = currentPlan();
+    if (!workout || !plan || workout.status === "working" || workout.status === "resting" || workout.status === "exercise-complete") {
       return;
     }
-    state.activeWorkout.status = "working";
-    state.activeWorkout.setStartedAt = Date.now();
+    workout.status = "working";
+    workout.setStartedAt = Date.now();
+    workout.setEndsAt = plan.type === "time" ? workout.setStartedAt + plan.target * 1000 : null;
     persistActiveWorkout();
     renderPlayer();
   }
 
-  function finishSet() {
+  function finishSet(options) {
+    options = options || {};
     var workout = state.activeWorkout;
     var plan = currentPlan();
     if (!workout || workout.status !== "working" || !plan) {
       return;
     }
+    var setKey = plan.itemId + ":" + workout.setNumber;
+    if (workout.savingSetKey === setKey) {
+      return;
+    }
 
-    var duration = Math.max(1, secondsBetween(workout.setStartedAt, Date.now()));
-    var actualReps = plan.type === "reps" ? askForReps(plan.target) : plan.target;
+    if (hasCompletedSet(plan, workout.setNumber)) {
+      workout.status = "resting";
+      workout.setStartedAt = null;
+      workout.setEndsAt = null;
+      workout.restStartedAt = Date.now();
+      workout.restEndsAt = workout.restStartedAt + plan.restSeconds * 1000;
+      persistActiveWorkout();
+      renderPlayer();
+      return;
+    }
+
+    var elapsed = Math.max(1, secondsBetween(workout.setStartedAt, Date.now()));
+    var duration = plan.type === "time" && options.auto ? plan.target : elapsed;
+    var actualReps = plan.type === "reps" ? askForReps(plan.target) : null;
     var setLog = {
       sessionId: workout.id,
+      workoutItemId: plan.itemId,
       exerciseId: plan.id,
       exerciseName: plan.name,
       bodyPart: plan.bodyPart,
@@ -663,10 +824,13 @@
     };
 
     els.finishSetBtn.disabled = true;
+    workout.savingSetKey = setKey;
     WorkoutDb.saveSet(setLog).then(function (savedSet) {
       workout.completedSets.push(Object.assign(setLog, savedSet || {}));
       workout.status = "resting";
+      workout.savingSetKey = null;
       workout.setStartedAt = null;
+      workout.setEndsAt = null;
       workout.restStartedAt = Date.now();
       workout.restEndsAt = workout.restStartedAt + plan.restSeconds * 1000;
       return persistActiveWorkout();
@@ -674,6 +838,7 @@
       updateModeWarning();
       renderPlayer();
     }).catch(function () {
+      workout.savingSetKey = null;
       showToast("Set save failed.");
       updateModeWarning();
       renderPlayer();
@@ -707,16 +872,21 @@
       WorkoutDb.updateSetRest(lastSet.id, lastSet.restDurationSeconds);
     }
 
-    if (workout.setNumber < plan.sets) {
+    var hasMoreSets = workout.setNumber < plan.sets;
+    if (hasMoreSets) {
       workout.setNumber += 1;
       workout.status = "ready";
     } else {
-      workout.status = "exercise-complete";
+      prepareNextExercise();
     }
     workout.restStartedAt = null;
     workout.restEndsAt = null;
-    persistActiveWorkout();
-    renderPlayer();
+    persistActiveWorkout().then(function () {
+      renderPlayer();
+      if (!skipped && hasMoreSets && currentPlan() && currentPlan().type === "time" && workout.status === "ready") {
+        startSet();
+      }
+    });
   }
 
   function updateCurrentRestDuration() {
@@ -739,13 +909,7 @@
 
     updateCurrentRestDuration();
 
-    if (workout.exerciseIndex < workout.exercises.length - 1) {
-      workout.exerciseIndex += 1;
-      workout.setNumber = 1;
-      workout.status = "ready";
-      workout.setStartedAt = null;
-      workout.restStartedAt = null;
-      workout.restEndsAt = null;
+    if (prepareNextExercise()) {
       persistActiveWorkout();
       renderPlayer();
       return;
@@ -797,6 +961,11 @@
     }
     state.tickId = setInterval(function () {
       var workout = state.activeWorkout;
+      var plan = currentPlan();
+      if (workout && plan && workout.status === "working" && plan.type === "time" && Date.now() >= workout.setEndsAt) {
+        finishSet({ auto: true });
+        return;
+      }
       if (workout && workout.status === "resting" && Date.now() >= workout.restEndsAt) {
         beep();
         completeRest(false);
@@ -805,6 +974,258 @@
         renderPlayer();
       }
     }, 1000);
+  }
+
+  function hasCompletedSet(plan, setNumber) {
+    return completedSetsForItem(plan).some(function (set) {
+      return Number(set.setNumber) === Number(setNumber);
+    });
+  }
+
+  function completedSetsForItem(plan) {
+    var workout = state.activeWorkout;
+    if (!workout || !plan) {
+      return [];
+    }
+    return workout.completedSets.filter(function (set) {
+      if (set.workoutItemId) {
+        return set.workoutItemId === plan.itemId;
+      }
+      return set.exerciseId === plan.id;
+    });
+  }
+
+  function completedSetCount(plan) {
+    return completedSetsForItem(plan).length;
+  }
+
+  function isExerciseComplete(plan) {
+    return completedSetCount(plan) >= plan.sets;
+  }
+
+  function prepareNextExercise() {
+    var workout = state.activeWorkout;
+    var plan = currentPlan();
+    if (!workout || !plan) {
+      return false;
+    }
+    var items = sortedWorkoutItems();
+    var currentIndex = items.findIndex(function (item) {
+      return item.itemId === plan.itemId;
+    });
+    var next = items.slice(currentIndex + 1).find(function (item) {
+      return !isExerciseComplete(item);
+    });
+    if (!next) {
+      workout.status = "exercise-complete";
+      workout.setStartedAt = null;
+      workout.setEndsAt = null;
+      workout.restStartedAt = null;
+      workout.restEndsAt = null;
+      return false;
+    }
+    workout.currentItemId = next.itemId;
+    workout.setNumber = Math.min(completedSetCount(next) + 1, next.sets);
+    workout.status = "ready";
+    workout.setStartedAt = null;
+    workout.setEndsAt = null;
+    workout.restStartedAt = null;
+    workout.restEndsAt = null;
+    return true;
+  }
+
+  function renderActiveWorkoutPlan() {
+    var workout = state.activeWorkout;
+    if (!els.activeWorkoutPlan) {
+      return;
+    }
+    els.activeWorkoutPlan.innerHTML = "";
+    if (!workout || !workout.exercises.length) {
+      els.activeWorkoutPlan.textContent = "No active workout plan.";
+      els.activeWorkoutPlan.classList.add("empty");
+      return;
+    }
+
+    els.activeWorkoutPlan.classList.remove("empty");
+    var items = sortedWorkoutItems();
+    items.forEach(function (item, index) {
+      var completed = completedSetCount(item);
+      var complete = completed >= item.sets;
+      var current = currentPlan() && currentPlan().itemId === item.itemId;
+      var row = document.createElement("div");
+      row.className = "active-plan-row" + (current ? " current" : "");
+      row.innerHTML =
+        '<div class="active-plan-main">' +
+        '<span class="order-badge">' + (index + 1) + "</span>" +
+        "<div><strong>" + escapeHtml(item.name) + "</strong>" +
+        "<small>" + completed + " / " + item.sets + " sets · " + targetLabel(item, item.target) + " · " + item.restSeconds + "s rest</small></div>" +
+        "</div>" +
+        '<div class="row-actions active-plan-actions">' +
+        '<button class="ghost-btn small-btn" type="button" data-action="up">Up</button>' +
+        '<button class="ghost-btn small-btn" type="button" data-action="down">Down</button>' +
+        '<button class="ghost-btn small-btn" type="button" data-action="edit">Edit</button>' +
+        '<button class="danger-btn small-btn" type="button" data-action="remove">Remove</button>' +
+        "</div>";
+
+      var buttons = row.querySelectorAll("button");
+      buttons[0].disabled = index === 0;
+      buttons[1].disabled = index === items.length - 1;
+      buttons[2].disabled = complete || (current && workout.status === "working");
+      buttons[3].disabled = complete || (current && workout.status === "working");
+      buttons.forEach(function (button) {
+        button.addEventListener("click", function () {
+          handleActivePlanAction(item.itemId, button.dataset.action);
+        });
+      });
+      els.activeWorkoutPlan.appendChild(row);
+    });
+  }
+
+  function handleActivePlanAction(itemId, action) {
+    if (action === "up" || action === "down") {
+      moveActiveWorkoutItem(itemId, action === "up" ? -1 : 1);
+      return;
+    }
+    if (action === "edit") {
+      editActiveWorkoutItem(itemId);
+      return;
+    }
+    if (action === "remove") {
+      removeActiveWorkoutItem(itemId);
+    }
+  }
+
+  function findWorkoutItem(itemId) {
+    if (!state.activeWorkout) {
+      return null;
+    }
+    return state.activeWorkout.exercises.find(function (item) {
+      return item.itemId === itemId;
+    }) || null;
+  }
+
+  function moveActiveWorkoutItem(itemId, direction) {
+    var workout = state.activeWorkout;
+    var items = sortedWorkoutItems();
+    var index = items.findIndex(function (item) {
+      return item.itemId === itemId;
+    });
+    var swapIndex = index + direction;
+    if (!workout || index < 0 || swapIndex < 0 || swapIndex >= items.length) {
+      return;
+    }
+    var order = items[index].order;
+    items[index].order = items[swapIndex].order;
+    items[swapIndex].order = order;
+    workout.exercises = sortedWorkoutItems().map(function (item, idx) {
+      item.order = idx + 1;
+      return item;
+    });
+    persistActiveWorkout().then(function () {
+      renderPlayer();
+    });
+  }
+
+  function editActiveWorkoutItem(itemId) {
+    var item = findWorkoutItem(itemId);
+    var workout = state.activeWorkout;
+    if (!item || !workout) {
+      return;
+    }
+    if (workout.currentItemId === itemId && workout.status === "working") {
+      showToast("Finish or cancel the current set before editing it.");
+      return;
+    }
+
+    var completed = completedSetCount(item);
+    var sets = askForNumber("Target sets?", item.sets, 1, 12);
+    if (sets === null) {
+      return;
+    }
+    if (sets < completed) {
+      sets = completed;
+      showToast("Target sets clamped to completed sets.");
+    }
+    var target = askForNumber(item.type === "time" ? "Target seconds?" : "Target reps?", item.target, 1, 300);
+    if (target === null) {
+      return;
+    }
+    var restSeconds = askForNumber("Rest seconds?", item.restSeconds, 1, 600);
+    if (restSeconds === null) {
+      return;
+    }
+
+    item.sets = sets;
+    item.target = target;
+    item.restSeconds = restSeconds;
+    if (workout.currentItemId === itemId && workout.setNumber > item.sets) {
+      workout.setNumber = item.sets;
+    }
+    persistActiveWorkout().then(function () {
+      renderPlayer();
+      showToast("Active workout plan updated.");
+    });
+  }
+
+  function removeActiveWorkoutItem(itemId) {
+    var workout = state.activeWorkout;
+    var item = findWorkoutItem(itemId);
+    if (!workout || !item) {
+      return;
+    }
+    var completed = completedSetCount(item);
+    if (completed >= item.sets) {
+      showToast("Completed exercises cannot be removed.");
+      return;
+    }
+    if (workout.currentItemId === itemId && workout.status === "working") {
+      showToast("Finish the active set before removing this exercise.");
+      return;
+    }
+    if (completed > 0 && !window.confirm("Remove this partially completed exercise from the remaining plan? Completed set logs will stay saved.")) {
+      return;
+    }
+
+    workout.exercises = workout.exercises.filter(function (plan) {
+      return plan.itemId !== itemId;
+    });
+    workout.exercises.sort(function (a, b) {
+      return a.order - b.order;
+    }).forEach(function (plan, index) {
+      plan.order = index + 1;
+    });
+
+    if (!workout.exercises.length) {
+      finishWorkout();
+      return;
+    }
+
+    if (workout.currentItemId === itemId) {
+      var next = sortedWorkoutItems().find(function (plan) {
+        return !isExerciseComplete(plan);
+      });
+      workout.currentItemId = next ? next.itemId : sortedWorkoutItems()[0].itemId;
+      workout.setNumber = next ? Math.min(completedSetCount(next) + 1, next.sets) : 1;
+      workout.status = next ? "ready" : "exercise-complete";
+      workout.setStartedAt = null;
+      workout.setEndsAt = null;
+      workout.restStartedAt = null;
+      workout.restEndsAt = null;
+    }
+
+    persistActiveWorkout().then(function () {
+      renderPlayer();
+      showToast("Exercise removed from active workout.");
+    });
+  }
+
+  function askForNumber(message, currentValue, min, max) {
+    var answer = window.prompt(message, String(currentValue));
+    if (answer === null) {
+      return null;
+    }
+    var parsed = cleanNumber(answer, currentValue);
+    return clamp(parsed, min, max);
   }
 
   function renderLiveSetLog(workout) {
@@ -819,9 +1240,10 @@
     workout.completedSets.slice().reverse().forEach(function (set) {
       var item = document.createElement("div");
       item.className = "set-row";
+      var amount = set.type === "time" ? (set.target || set.setDurationSeconds) + "s" : set.reps + " reps";
       item.innerHTML =
         "<strong>" + escapeHtml(set.exerciseName) + " · Set " + set.setNumber + "</strong>" +
-        "<span>" + set.reps + (set.type === "time" ? "s" : " reps") +
+        "<span>" + amount +
         " · work " + formatTime(set.setDurationSeconds) +
         " · rest " + formatTime(set.restDurationSeconds) + "</span>";
       els.liveSetLog.appendChild(item);
@@ -855,9 +1277,10 @@
       session.completedSets.forEach(function (set) {
         var row = document.createElement("div");
         row.className = "set-row";
+        var amount = set.type === "time" ? (set.target || set.setDurationSeconds) + "s" : set.reps + " reps";
         row.innerHTML =
           "<strong>" + escapeHtml(set.exerciseName) + " · Set " + set.setNumber + "</strong>" +
-          "<span>" + set.reps + (set.type === "time" ? "s" : " reps") +
+          "<span>" + amount +
           " · work " + formatTime(set.setDurationSeconds) +
           " · rest " + formatTime(set.restDurationSeconds) + "</span>";
         detailList.appendChild(row);
@@ -954,6 +1377,7 @@
           state.exercises = Array.isArray(data.exercises) ? data.exercises : clone(WorkoutSeed.exercises);
           state.sessions = Array.isArray(data.sessions) ? data.sessions : [];
           state.activeWorkout = data.activeWorkout || null;
+          normalizeActiveWorkout();
           seedBuilderDefaults();
           renderAll();
           updateModeWarning();

@@ -67,9 +67,12 @@
           </div>
           <div class="builder-actions">
             <button class="ghost-btn" id="openExerciseEditorBtn" type="button">Add Exercise</button>
+            <button class="danger-btn" id="discardWorkoutBtn" type="button" hidden>Discard Current Workout and Start New</button>
             <button class="primary-btn" id="startWorkoutBtn" type="button">Start Workout</button>
           </div>
         </div>
+
+        <p class="builder-notice" id="builderNotice" hidden>Workout in progress — new selected exercises will be added, not reset.</p>
 
         <div class="filter-box">
           <p class="field-label">Body parts</p>
@@ -140,6 +143,11 @@
           <button class="ghost-btn big-btn" id="skipRestBtn" type="button">Skip Rest</button>
           <button class="ghost-btn big-btn" id="finishExerciseBtn" type="button">Finish Exercise</button>
           <button class="danger-btn big-btn" id="finishWorkoutBtn" type="button">Finish Workout</button>
+        </div>
+
+        <div class="active-plan">
+          <h3>Active workout plan</h3>
+          <div id="activeWorkoutPlan" class="active-plan-list empty">No active workout plan.</div>
         </div>
 
         <div class="mini-log">

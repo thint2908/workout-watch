@@ -6,11 +6,12 @@ A GitHub Pages friendly calisthenics workout tracker built with HTML, CSS, and v
 
 - Beginner exercise library grouped by body part.
 - Workout builder with editable sets, reps or seconds, and rest time.
+- Active workout editing: add more exercises, adjust pending targets, remove unfinished exercises, and reorder the active plan without restarting the session.
 - Intelligent default rest suggestions:
   - Easy, accessory, and core work: 30-45 seconds.
   - Normal strength work: 60-90 seconds.
   - Hard compound movements: 90-120 seconds.
-- Workout timer with elapsed time, set timer, rest countdown, skip rest, and manual workout finish.
+- Workout timer with elapsed time, set timer, rest countdown, skip rest, timed-set auto-finish, and manual workout finish.
 - Workout logs with expandable session details.
 - Exercise statistics and weekly summary.
 - Supabase cloud persistence using the public anon key plus authenticated RLS.
@@ -72,6 +73,19 @@ python -m http.server 8000
 ```
 
 Then visit `http://localhost:8000`.
+
+## Workout Flow
+
+Use **Builder** to select exercises and set target sets, reps or seconds, and rest. If no workout is active, **Start Workout** creates one session and opens the timer. If a workout is already active, the button changes to **Add to Current Workout**; selected exercises that are not already in the active plan are appended without resetting the current exercise, set, timer, or saved logs.
+
+The timer page includes an active plan editor. Each row shows its order, completed sets, target sets, target reps or seconds, and rest. Use **Up** and **Down** to reorder exercises before or during the workout. Use **Edit** to change pending targets. If an exercise already has completed sets, those logs are preserved; target sets cannot be reduced below the completed set count. Use **Remove** for unfinished exercises. Fully completed exercises cannot be removed from the active plan.
+
+Timed and reps exercises behave differently:
+
+- **Timed exercises** start a countdown from the target seconds. When the countdown reaches zero, the set is saved automatically with `actual_duration_seconds` equal to the target, rest starts automatically, and after rest the next timed set starts automatically. You can still finish early; the elapsed time is saved.
+- **Reps exercises** start a stopwatch. You manually finish the set, enter actual reps, and then rest starts automatically. After rest, the next reps set is prepared but not auto-started.
+
+Active workout state is saved to localStorage after workout changes, including starting, adding, removing, reordering, starting or finishing sets, rest changes, and finishing the workout. Refreshing the page restores the active session, plan order, current exercise, current set, elapsed time, timer mode, rest countdown, and completed set logs.
 
 ## GitHub Pages
 
