@@ -907,8 +907,6 @@
     if (data.activeWorkout) {
       localSet("activeWorkout", data.activeWorkout);
     }
-    online = false;
-    offlineReason = "Imported into local fallback storage.";
     return Promise.resolve();
   }
 

@@ -1691,6 +1691,10 @@
           showToast("No local logs to sync.");
           return;
         }
+        if (!result.synced && result.skipped) {
+          showToast(result.skipped + " local log" + (result.skipped === 1 ? "" : "s") + " already in Supabase.");
+          return;
+        }
         showToast("Synced " + result.synced + " local log" + (result.synced === 1 ? "" : "s") + ".");
       });
     }).catch(function () {
