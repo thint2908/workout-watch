@@ -58,10 +58,9 @@
         });
       }
 
-      if (response.status === 204) {
-        return null;
-      }
-      return response.json();
+      return response.text().then(function (text) {
+        return text ? JSON.parse(text) : null;
+      });
     }).then(function (data) {
       online = true;
       offlineReason = "";
@@ -902,12 +901,27 @@
 
   function importData(data) {
     localSet("exercises", Array.isArray(data.exercises) ? data.exercises : window.WorkoutSeed.exercises);
-    localSet("sessions", Array.isArray(data.sessions) ? data.sessions : []);
-    localSet("pendingSessions", Array.isArray(data.sessions) ? data.sessions : []);
+    localSet("sessions", mergeSessions(localGet("sessions", []), Array.isArray(data.sessions) ? data.sessions : []));
+    localSet("pendingSessions", mergeSessions(localGet("pendingSessions", []), Array.isArray(data.sessions) ? data.sessions : []));
     if (data.activeWorkout) {
       localSet("activeWorkout", data.activeWorkout);
     }
     return Promise.resolve();
+  }
+
+  function mergeSessions(existing, incoming) {
+    var bySignature = {};
+    existing.concat(incoming).forEach(function (session) {
+      if (!session || !session.startedAt) {
+        return;
+      }
+      bySignature[sessionSignature(session)] = session;
+    });
+    return Object.keys(bySignature).map(function (key) {
+      return bySignature[key];
+    }).sort(function (a, b) {
+      return new Date(b.startedAt) - new Date(a.startedAt);
+    });
   }
 
   window.WorkoutDb = {

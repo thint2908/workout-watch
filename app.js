@@ -1666,9 +1666,15 @@
       try {
         var data = JSON.parse(reader.result);
         WorkoutDb.importData(data).then(function () {
-          state.exercises = Array.isArray(data.exercises) ? data.exercises : clone(WorkoutSeed.exercises);
-          state.sessions = Array.isArray(data.sessions) ? data.sessions : [];
-          state.activeWorkout = data.activeWorkout || null;
+          return Promise.all([
+            WorkoutDb.listExercises(),
+            WorkoutDb.listSessions(),
+            WorkoutDb.getActiveWorkout()
+          ]);
+        }).then(function (records) {
+          state.exercises = records[0].length ? records[0] : clone(WorkoutSeed.exercises);
+          state.sessions = records[1] || [];
+          state.activeWorkout = records[2] || null;
           normalizeActiveWorkout();
           seedBuilderDefaults();
           renderAll();
