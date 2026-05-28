@@ -747,6 +747,22 @@ th {
   justify-content: flex-end;
 }
 
+.version-badge {
+  position: fixed;
+  left: 10px;
+  bottom: 10px;
+  z-index: 4;
+  padding: 5px 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(25, 30, 28, 0.88);
+  color: var(--muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 0.72rem;
+  font-weight: 800;
+  pointer-events: none;
+}
+
 .toast {
   position: fixed;
   right: 16px;
