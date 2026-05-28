@@ -21,6 +21,7 @@
   function init() {
     cacheElements();
     bindEvents();
+    renderVersionBadge();
     setAuthenticatedUi(false);
     WorkoutDb.initAuthFromUrl().then(function () {
       if (!WorkoutDb.isAuthenticated()) {
@@ -98,6 +99,7 @@
     els.weeklyStats = document.getElementById("weeklyStats");
     els.exerciseStats = document.getElementById("exerciseStats");
     els.toast = document.getElementById("toast");
+    els.versionBadge = document.getElementById("versionBadge");
     els.modeWarning = document.getElementById("modeWarning");
     els.authPanel = document.getElementById("authPanel");
     els.authForm = document.getElementById("authForm");
@@ -285,6 +287,7 @@
   }
 
   function renderAll() {
+    renderVersionBadge();
     renderLibrary();
     renderFilters();
     renderExerciseFormOptions();
@@ -292,6 +295,14 @@
     renderPlayer();
     renderLog();
     renderStats();
+  }
+
+  function renderVersionBadge() {
+    if (!els.versionBadge) {
+      return;
+    }
+    var version = window.WorkoutVersion && window.WorkoutVersion.label ? window.WorkoutVersion.label : "dev";
+    els.versionBadge.textContent = version;
   }
 
   function renderExerciseFormOptions() {
