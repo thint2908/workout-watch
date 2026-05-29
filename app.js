@@ -734,12 +734,7 @@
     }
 
     if (!currentPlan() || workout.status === "exercise-complete") {
-      var next = sortedWorkoutItems().find(function (item) {
-        return !isExerciseComplete(item);
-      });
-      workout.currentItemId = next ? next.itemId : sortedWorkoutItems()[0].itemId;
-      workout.setNumber = 1;
-      workout.status = "ready";
+      selectFirstIncompleteWorkoutItem();
     }
 
     persistActiveWorkout().then(function () {
@@ -796,6 +791,9 @@
       workout.currentItemId = legacy ? legacy.itemId : null;
     }
     workout.setNumber = cleanNumber(workout.setNumber, 1);
+    if ((!currentPlan() || isExerciseComplete(currentPlan())) && workout.status !== "working" && workout.status !== "resting") {
+      selectFirstIncompleteWorkoutItem();
+    }
     var plan = currentPlan();
     if (plan && workout.status === "working" && plan.type === "time" && !workout.setEndsAt && workout.setStartedAt) {
       workout.setEndsAt = workout.setStartedAt + plan.target * 1000;
@@ -988,18 +986,10 @@
       WorkoutDb.updateSetRest(lastSet.id, lastSet.restDurationSeconds);
     }
 
-    var hasMoreSets = workout.setNumber < plan.sets;
-    if (hasMoreSets) {
-      workout.setNumber += 1;
-      workout.status = "ready";
-    } else {
-      prepareNextExercise();
-    }
-    workout.restStartedAt = null;
-    workout.restEndsAt = null;
+    selectFirstIncompleteWorkoutItem();
     persistActiveWorkout().then(function () {
       renderPlayer();
-      if (!skipped && hasMoreSets && currentPlan() && currentPlan().type === "time" && workout.status === "ready") {
+      if (!skipped && currentPlan() && currentPlan().type === "time" && workout.status === "ready") {
         startSet();
       }
     });
@@ -1119,6 +1109,33 @@
     return completedSetCount(plan) >= plan.sets;
   }
 
+  function selectFirstIncompleteWorkoutItem(excludedItemId) {
+    var workout = state.activeWorkout;
+    if (!workout) {
+      return false;
+    }
+    var next = sortedWorkoutItems().find(function (item) {
+      return item.itemId !== excludedItemId && !isExerciseComplete(item);
+    });
+    if (!next) {
+      workout.status = "exercise-complete";
+      workout.setNumber = 1;
+      workout.setStartedAt = null;
+      workout.setEndsAt = null;
+      workout.restStartedAt = null;
+      workout.restEndsAt = null;
+      return false;
+    }
+    workout.currentItemId = next.itemId;
+    workout.setNumber = completedSetCount(next) + 1;
+    workout.status = "ready";
+    workout.setStartedAt = null;
+    workout.setEndsAt = null;
+    workout.restStartedAt = null;
+    workout.restEndsAt = null;
+    return true;
+  }
+
   function prepareNextExercise() {
     var workout = state.activeWorkout;
     var plan = currentPlan();
@@ -1133,12 +1150,7 @@
       return !isExerciseComplete(item);
     });
     if (!next) {
-      workout.status = "exercise-complete";
-      workout.setStartedAt = null;
-      workout.setEndsAt = null;
-      workout.restStartedAt = null;
-      workout.restEndsAt = null;
-      return false;
+      return selectFirstIncompleteWorkoutItem(plan.itemId);
     }
     workout.currentItemId = next.itemId;
     workout.setNumber = Math.min(completedSetCount(next) + 1, next.sets);
@@ -1237,6 +1249,9 @@
       item.order = idx + 1;
       return item;
     });
+    if (workout.status !== "working" && workout.status !== "resting") {
+      selectFirstIncompleteWorkoutItem();
+    }
     persistActiveWorkout().then(function () {
       renderPlayer();
     });
