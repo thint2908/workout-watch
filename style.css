@@ -272,6 +272,7 @@ main {
 
 .body-card,
 .filter-box,
+.preset-box,
 .exercise-form,
 .workout-panel,
 .session-card,
@@ -284,6 +285,7 @@ main {
 
 .body-card,
 .filter-box,
+.preset-box,
 .exercise-form,
 .workout-panel {
   padding: 16px;
@@ -467,6 +469,63 @@ td small,
   color: var(--primary);
   font-variant-numeric: tabular-nums;
   font-size: 1.2rem;
+}
+
+.preset-box {
+  margin-bottom: 14px;
+}
+
+.preset-heading,
+.preset-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.preset-heading {
+  margin-bottom: 10px;
+}
+
+.preset-heading .field-label {
+  margin-bottom: 0;
+}
+
+.preset-list {
+  display: grid;
+  gap: 8px;
+}
+
+.preset-row {
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-2);
+}
+
+.preset-row.current {
+  border-color: var(--primary);
+  background: rgba(68, 209, 122, 0.12);
+}
+
+.preset-main {
+  min-width: 0;
+}
+
+.preset-main strong,
+.preset-main small {
+  overflow-wrap: anywhere;
+}
+
+.preset-main small {
+  display: block;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.preset-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .chip-row {
@@ -847,6 +906,17 @@ th {
   .active-plan-row {
     grid-template-columns: 1fr;
     align-items: stretch;
+  }
+
+  .preset-heading,
+  .preset-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .preset-actions {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
   }
 
   .active-plan-actions {

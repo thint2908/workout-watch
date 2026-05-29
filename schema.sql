@@ -34,6 +34,16 @@ create table if not exists public.workout_sessions (
   created_at timestamptz default now()
 );
 
+create table if not exists public.workout_presets (
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid default auth.uid(),
+  name text not null,
+  items jsonb not null default '[]'::jsonb,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now(),
+  unique (owner_id, name)
+);
+
 create table if not exists public.workout_sets (
   id uuid primary key default gen_random_uuid(),
   owner_id uuid default auth.uid(),
@@ -51,6 +61,7 @@ create table if not exists public.workout_sets (
 
 alter table public.exercises add column if not exists owner_id uuid default auth.uid();
 alter table public.workout_sessions add column if not exists owner_id uuid default auth.uid();
+alter table public.workout_presets add column if not exists owner_id uuid default auth.uid();
 alter table public.workout_sets add column if not exists owner_id uuid default auth.uid();
 
 alter table public.workout_sets drop constraint if exists workout_sets_exercise_id_fkey;
@@ -68,6 +79,11 @@ set owner_id = (select id from auth.users where lower(email) = 'thint2908@gmail.
 where owner_id is null
   and exists (select 1 from auth.users where lower(email) = 'thint2908@gmail.com');
 
+update public.workout_presets
+set owner_id = (select id from auth.users where lower(email) = 'thint2908@gmail.com' limit 1)
+where owner_id is null
+  and exists (select 1 from auth.users where lower(email) = 'thint2908@gmail.com');
+
 update public.workout_sets
 set owner_id = (select id from auth.users where lower(email) = 'thint2908@gmail.com' limit 1)
 where owner_id is null
@@ -79,17 +95,22 @@ create index if not exists workout_sets_session_id_idx on public.workout_sets(se
 create index if not exists workout_sets_exercise_id_idx on public.workout_sets(exercise_id);
 create index if not exists workout_sessions_owner_id_idx on public.workout_sessions(owner_id);
 create index if not exists workout_sessions_started_at_idx on public.workout_sessions(started_at desc);
+create index if not exists workout_presets_owner_id_idx on public.workout_presets(owner_id);
+create index if not exists workout_presets_name_idx on public.workout_presets(name);
 
 alter table public.exercises enable row level security;
 alter table public.workout_sessions enable row level security;
+alter table public.workout_presets enable row level security;
 alter table public.workout_sets enable row level security;
 
 revoke all on public.exercises from anon;
 revoke all on public.workout_sessions from anon;
+revoke all on public.workout_presets from anon;
 revoke all on public.workout_sets from anon;
 
 grant select, insert, update, delete on public.exercises to authenticated;
 grant select, insert, update, delete on public.workout_sessions to authenticated;
+grant select, insert, update, delete on public.workout_presets to authenticated;
 grant select, insert, update, delete on public.workout_sets to authenticated;
 
 drop policy if exists "public exercises select" on public.exercises;
@@ -109,6 +130,10 @@ drop policy if exists "owner sessions select" on public.workout_sessions;
 drop policy if exists "owner sessions insert" on public.workout_sessions;
 drop policy if exists "owner sessions update" on public.workout_sessions;
 drop policy if exists "owner sessions delete" on public.workout_sessions;
+drop policy if exists "owner presets select" on public.workout_presets;
+drop policy if exists "owner presets insert" on public.workout_presets;
+drop policy if exists "owner presets update" on public.workout_presets;
+drop policy if exists "owner presets delete" on public.workout_presets;
 
 drop policy if exists "public sets select" on public.workout_sets;
 drop policy if exists "public sets insert" on public.workout_sets;
@@ -158,6 +183,27 @@ create policy "owner sessions update"
 
 create policy "owner sessions delete"
   on public.workout_sessions for delete
+  to authenticated
+  using (public.is_allowed_owner() and owner_id = auth.uid());
+
+create policy "owner presets select"
+  on public.workout_presets for select
+  to authenticated
+  using (public.is_allowed_owner() and owner_id = auth.uid());
+
+create policy "owner presets insert"
+  on public.workout_presets for insert
+  to authenticated
+  with check (public.is_allowed_owner() and owner_id = auth.uid());
+
+create policy "owner presets update"
+  on public.workout_presets for update
+  to authenticated
+  using (public.is_allowed_owner() and owner_id = auth.uid())
+  with check (public.is_allowed_owner() and owner_id = auth.uid());
+
+create policy "owner presets delete"
+  on public.workout_presets for delete
   to authenticated
   using (public.is_allowed_owner() and owner_id = auth.uid());
 

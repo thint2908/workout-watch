@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Workout Watch</title>
-    <link rel="stylesheet" href="style.css?v=20260526-modal-fix">
+    <link rel="stylesheet" href="style.css?v=20260529-presets">
   </head>
   <body>
     <header class="app-header">
@@ -79,6 +79,14 @@
           <span>Selected ETA</span>
           <strong>00:00</strong>
           <small>0 exercises selected</small>
+        </div>
+
+        <div class="preset-box">
+          <div class="preset-heading">
+            <p class="field-label">Workout presets</p>
+            <button class="ghost-btn small-btn" id="savePresetBtn" type="button">Save Current as Preset</button>
+          </div>
+          <div id="presetList" class="preset-list empty">No presets saved yet.</div>
         </div>
 
         <div class="filter-box">
@@ -282,8 +290,8 @@
 
     <script src="config.js?v=20260526-auth" defer></script>
     <script src="seed.js?v=20260526-auth" defer></script>
-    <script src="supabaseClient.js?v=20260526-auth" defer></script>
+    <script src="supabaseClient.js?v=20260529-presets" defer></script>
     <script src="version.js?v=auto" defer></script>
-    <script src="app.js?v=20260529-active-plan-order" defer></script>
+    <script src="app.js?v=20260529-presets" defer></script>
   </body>
 </html>

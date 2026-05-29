@@ -4,10 +4,12 @@
   var TARGET_SECONDS = 45 * 60;
   var state = {
     exercises: [],
+    presets: [],
     sessions: [],
     selectedBodyParts: [],
     builder: {},
     builderSelectionCounter: 0,
+    activePresetId: null,
     editingExerciseId: null,
     activeWorkout: null,
     activeTab: "library",
@@ -37,11 +39,13 @@
     Promise.all([
       WorkoutDb.listExercises(),
       WorkoutDb.listSessions(),
-      WorkoutDb.getActiveWorkout()
+      WorkoutDb.getActiveWorkout(),
+      WorkoutDb.listPresets()
     ]).then(function (records) {
       state.exercises = records[0].length ? records[0] : clone(WorkoutSeed.exercises);
       state.sessions = records[1] || [];
       state.activeWorkout = records[2];
+      state.presets = records[3] || [];
       normalizeActiveWorkout();
       state.selectedBodyParts = clone(WorkoutSeed.bodyParts);
       seedBuilderDefaults();
@@ -62,6 +66,8 @@
     els.libraryGrid = document.getElementById("libraryGrid");
     els.bodyPartFilters = document.getElementById("bodyPartFilters");
     els.builderRows = document.getElementById("builderRows");
+    els.presetList = document.getElementById("presetList");
+    els.savePresetBtn = document.getElementById("savePresetBtn");
     els.openExerciseEditorBtn = document.getElementById("openExerciseEditorBtn");
     els.exerciseModal = document.getElementById("exerciseModal");
     els.exerciseForm = document.getElementById("exerciseForm");
@@ -136,6 +142,7 @@
     els.signOutBtn.addEventListener("click", signOut);
     els.startWorkoutBtn.addEventListener("click", startWorkout);
     els.discardWorkoutBtn.addEventListener("click", discardWorkout);
+    els.savePresetBtn.addEventListener("click", saveCurrentAsPreset);
     els.openExerciseEditorBtn.addEventListener("click", openNewExerciseModal);
     els.exerciseForm.addEventListener("submit", saveExerciseFromForm);
     els.cancelEditBtn.addEventListener("click", closeExerciseModal);
@@ -211,8 +218,10 @@
   function signOut() {
     WorkoutDb.signOut().then(function () {
       state.exercises = [];
+      state.presets = [];
       state.sessions = [];
       state.activeWorkout = null;
+      state.activePresetId = null;
       state.builder = {};
       setAuthenticatedUi(false);
       renderPlayer();
@@ -291,6 +300,7 @@
     renderLibrary();
     renderFilters();
     renderExerciseFormOptions();
+    renderPresets();
     renderBuilder();
     renderPlayer();
     renderLog();
@@ -432,6 +442,286 @@
       els.builderRows.appendChild(row);
     });
     renderBuilderEta();
+  }
+
+  function renderPresets() {
+    els.presetList.innerHTML = "";
+    if (!state.presets.length) {
+      els.presetList.textContent = "No presets saved yet.";
+      els.presetList.classList.add("empty");
+      return;
+    }
+    els.presetList.classList.remove("empty");
+    state.presets.forEach(function (preset) {
+      var count = presetExerciseCount(preset);
+      var missing = missingPresetExerciseCount(preset);
+      var current = state.activePresetId === preset.id;
+      var row = document.createElement("div");
+      row.className = "preset-row" + (current ? " current" : "");
+      row.innerHTML =
+        '<div class="preset-main">' +
+        "<strong>" + escapeHtml(preset.name) + "</strong>" +
+        "<small>" + count + " exercise" + (count === 1 ? "" : "s") +
+        (missing ? " · " + missing + " missing" : "") + "</small>" +
+        "</div>" +
+        '<div class="row-actions preset-actions">' +
+        '<button class="ghost-btn small-btn" type="button" data-action="load">Load</button>' +
+        '<button class="ghost-btn small-btn" type="button" data-action="update">Update</button>' +
+        '<button class="ghost-btn small-btn" type="button" data-action="rename">Rename</button>' +
+        '<button class="danger-btn small-btn" type="button" data-action="delete">Delete</button>' +
+        "</div>";
+      row.querySelectorAll("button").forEach(function (button) {
+        button.addEventListener("click", function () {
+          handlePresetAction(preset.id, button.dataset.action);
+        });
+      });
+      els.presetList.appendChild(row);
+    });
+  }
+
+  function presetExerciseCount(preset) {
+    return (preset.items || []).filter(function (item) {
+      return findExercise(item.exerciseId);
+    }).length;
+  }
+
+  function missingPresetExerciseCount(preset) {
+    return (preset.items || []).length - presetExerciseCount(preset);
+  }
+
+  function handlePresetAction(presetId, action) {
+    var preset = findPreset(presetId);
+    if (!preset) {
+      return;
+    }
+    if (action === "load") {
+      loadPreset(preset);
+      return;
+    }
+    if (action === "update") {
+      updatePresetFromBuilder(preset);
+      return;
+    }
+    if (action === "rename") {
+      renamePreset(preset);
+      return;
+    }
+    if (action === "delete") {
+      deletePreset(preset);
+    }
+  }
+
+  function findPreset(presetId) {
+    return state.presets.find(function (preset) {
+      return preset.id === presetId;
+    }) || null;
+  }
+
+  function findExercise(exerciseId) {
+    return state.exercises.find(function (exercise) {
+      return exercise.id === exerciseId;
+    }) || null;
+  }
+
+  function currentPresetItems() {
+    return state.exercises.filter(function (exercise) {
+      return state.builder[exercise.id] && state.builder[exercise.id].selected;
+    }).sort(function (a, b) {
+      return selectionOrderForExercise(a) - selectionOrderForExercise(b);
+    }).map(function (exercise, index) {
+      var config = state.builder[exercise.id];
+      return {
+        exerciseId: exercise.id,
+        sets: cleanNumber(config.sets, exercise.defaultSets || 1),
+        target: cleanNumber(config.target, defaultTarget(exercise) || 1),
+        restSeconds: cleanNumber(config.restSeconds, suggestedRest(exercise)),
+        order: index + 1
+      };
+    });
+  }
+
+  function presetNameExists(name, exceptId) {
+    var key = String(name || "").trim().toLowerCase();
+    return state.presets.some(function (preset) {
+      return preset.id !== exceptId && String(preset.name || "").trim().toLowerCase() === key;
+    });
+  }
+
+  function saveCurrentAsPreset() {
+    var items = currentPresetItems();
+    if (!items.length) {
+      showToast("Select exercises before saving a preset.");
+      return;
+    }
+    textDialog({
+      title: "Save preset",
+      message: "Save the current builder selection as a workout preset.",
+      label: "Preset name",
+      value: "",
+      confirmText: "Save"
+    }).then(function (name) {
+      name = String(name || "").trim();
+      if (!name) {
+        return;
+      }
+      if (presetNameExists(name)) {
+        showToast("Preset name already exists.");
+        return;
+      }
+      WorkoutDb.createPreset({ name: name, items: items }).then(function (preset) {
+        state.presets.push(preset);
+        state.presets.sort(sortPresetsByName);
+        state.activePresetId = preset.id;
+        renderPresets();
+        updateModeWarning();
+        showToast("Preset saved.");
+      }).catch(function () {
+        showToast("Preset save failed.");
+        updateModeWarning();
+      });
+    });
+  }
+
+  function updatePresetFromBuilder(preset) {
+    var items = currentPresetItems();
+    if (!items.length) {
+      showToast("Select exercises before updating a preset.");
+      return;
+    }
+    WorkoutDb.updatePreset(preset.id, {
+      name: preset.name,
+      items: items
+    }).then(function (saved) {
+      replacePreset(saved);
+      state.activePresetId = saved.id;
+      renderPresets();
+      updateModeWarning();
+      showToast("Preset updated.");
+    }).catch(function () {
+      showToast("Preset update failed.");
+      updateModeWarning();
+    });
+  }
+
+  function renamePreset(preset) {
+    textDialog({
+      title: "Rename preset",
+      message: "Rename this saved workout preset.",
+      label: "Preset name",
+      value: preset.name,
+      confirmText: "Save"
+    }).then(function (name) {
+      name = String(name || "").trim();
+      if (!name || name === preset.name) {
+        return;
+      }
+      if (presetNameExists(name, preset.id)) {
+        showToast("Preset name already exists.");
+        return;
+      }
+      WorkoutDb.updatePreset(preset.id, {
+        name: name,
+        items: preset.items || []
+      }).then(function (saved) {
+        replacePreset(saved);
+        renderPresets();
+        updateModeWarning();
+        showToast("Preset renamed.");
+      }).catch(function () {
+        showToast("Preset rename failed.");
+        updateModeWarning();
+      });
+    });
+  }
+
+  function deletePreset(preset) {
+    confirmDialog({
+      title: "Delete preset?",
+      message: "Delete " + preset.name + " from saved workout presets?",
+      confirmText: "Delete",
+      danger: true
+    }).then(function (confirmed) {
+      if (!confirmed) {
+        return;
+      }
+      WorkoutDb.deletePreset(preset.id).then(function () {
+        state.presets = state.presets.filter(function (item) {
+          return item.id !== preset.id;
+        });
+        if (state.activePresetId === preset.id) {
+          state.activePresetId = null;
+        }
+        renderPresets();
+        updateModeWarning();
+        showToast("Preset deleted.");
+      }).catch(function () {
+        showToast("Preset delete failed.");
+        updateModeWarning();
+      });
+    });
+  }
+
+  function loadPreset(preset) {
+    var availableItems = (preset.items || []).filter(function (item) {
+      return findExercise(item.exerciseId);
+    });
+    if (!availableItems.length) {
+      showToast("Preset has no available exercises.");
+      return;
+    }
+
+    state.builderSelectionCounter = 0;
+    Object.keys(state.builder).forEach(function (exerciseId) {
+      state.builder[exerciseId].selected = false;
+      state.builder[exerciseId].selectionOrder = null;
+    });
+
+    var loaded = 0;
+    var selectedBodyParts = {};
+    availableItems.slice().sort(function (a, b) {
+      return cleanNumber(a.order, 0) - cleanNumber(b.order, 0);
+    }).forEach(function (item) {
+      var exercise = findExercise(item.exerciseId);
+      if (!exercise) {
+        return;
+      }
+      if (!state.builder[exercise.id]) {
+        state.builder[exercise.id] = {
+          selected: false,
+          sets: exercise.defaultSets,
+          target: defaultTarget(exercise),
+          restSeconds: suggestedRest(exercise)
+        };
+      }
+      state.builder[exercise.id].selected = true;
+      state.builder[exercise.id].selectionOrder = nextBuilderSelectionOrder();
+      state.builder[exercise.id].sets = cleanNumber(item.sets, exercise.defaultSets || 1);
+      state.builder[exercise.id].target = cleanNumber(item.target, defaultTarget(exercise) || 1);
+      state.builder[exercise.id].restSeconds = cleanNumber(item.restSeconds, suggestedRest(exercise));
+      selectedBodyParts[exercise.bodyPart] = true;
+      loaded += 1;
+    });
+
+    state.activePresetId = preset.id;
+    Object.keys(selectedBodyParts).forEach(function (bodyPart) {
+      if (state.selectedBodyParts.indexOf(bodyPart) < 0) {
+        state.selectedBodyParts.push(bodyPart);
+      }
+    });
+    renderFilters();
+    renderBuilder();
+    renderPresets();
+    showToast(loaded ? "Preset loaded." : "Preset has no available exercises.");
+  }
+
+  function replacePreset(preset) {
+    state.presets = state.presets.map(function (item) {
+      return item.id === preset.id ? preset : item;
+    }).sort(sortPresetsByName);
+  }
+
+  function sortPresetsByName(a, b) {
+    return String(a.name || "").localeCompare(String(b.name || ""));
   }
 
   function renderBuilderEta() {
@@ -1705,12 +1995,15 @@
           return Promise.all([
             WorkoutDb.listExercises(),
             WorkoutDb.listSessions(),
-            WorkoutDb.getActiveWorkout()
+            WorkoutDb.getActiveWorkout(),
+            WorkoutDb.listPresets()
           ]);
         }).then(function (records) {
           state.exercises = records[0].length ? records[0] : clone(WorkoutSeed.exercises);
           state.sessions = records[1] || [];
           state.activeWorkout = records[2] || null;
+          state.presets = records[3] || [];
+          state.activePresetId = null;
           normalizeActiveWorkout();
           seedBuilderDefaults();
           renderAll();
@@ -1758,13 +2051,17 @@
         return;
       }
       state.exercises = clone(WorkoutSeed.exercises);
+      state.presets = [];
       state.sessions = [];
       state.activeWorkout = null;
+      state.activePresetId = null;
       seedBuilderDefaults();
       WorkoutDb.deleteAllData().then(function (exercises) {
         state.exercises = exercises && exercises.length ? exercises : clone(WorkoutSeed.exercises);
+        state.presets = [];
         state.sessions = [];
         state.activeWorkout = null;
+        state.activePresetId = null;
         seedBuilderDefaults();
         return persistActiveWorkout();
       }).then(function () {
@@ -1842,6 +2139,15 @@
     }, options || {}));
   }
 
+  function textDialog(options) {
+    return openAppDialog(Object.assign({
+      type: "text",
+      kicker: "Input",
+      confirmText: "OK",
+      cancelText: "Cancel"
+    }, options || {}));
+  }
+
   function openAppDialog(options) {
     return new Promise(function (resolve) {
       state.appDialogResolve = resolve;
@@ -1852,19 +2158,29 @@
       els.appDialogConfirmBtn.textContent = options.confirmText || "OK";
       els.appDialogCancelBtn.textContent = options.cancelText || "Cancel";
       els.appDialogConfirmBtn.className = options.danger ? "danger-btn" : "primary-btn";
-      els.appDialogInputRow.hidden = options.type !== "number";
+      els.appDialogInputRow.hidden = options.type !== "number" && options.type !== "text";
       if (options.type === "number") {
+        els.appDialogInput.type = "number";
+        els.appDialogInput.inputMode = "numeric";
         els.appDialogInputLabel.textContent = options.label || "Value";
         els.appDialogInput.value = options.value || 1;
         els.appDialogInput.min = options.min || 1;
         els.appDialogInput.max = options.max || "";
         els.appDialogInput.step = options.step || 1;
+      } else if (options.type === "text") {
+        els.appDialogInput.type = "text";
+        els.appDialogInput.inputMode = "text";
+        els.appDialogInputLabel.textContent = options.label || "Value";
+        els.appDialogInput.value = options.value || "";
+        els.appDialogInput.min = "";
+        els.appDialogInput.max = "";
+        els.appDialogInput.step = "";
       }
       els.appDialog.hidden = false;
       els.appDialog.classList.add("is-open");
       document.body.classList.add("modal-open");
       window.setTimeout(function () {
-        if (options.type === "number") {
+        if (options.type === "number" || options.type === "text") {
           els.appDialogInput.focus();
           els.appDialogInput.select();
         } else {
@@ -1881,12 +2197,16 @@
       closeAppDialog(clamp(cleanNumber(els.appDialogInput.value, options.value || 1), options.min || 1, options.max || 9999));
       return;
     }
+    if (options.type === "text") {
+      closeAppDialog(els.appDialogInput.value.trim());
+      return;
+    }
     closeAppDialog(true);
   }
 
   function cancelAppDialog() {
     var options = state.appDialogOptions || {};
-    closeAppDialog(options.type === "number" ? null : false);
+    closeAppDialog(options.type === "number" || options.type === "text" ? null : false);
   }
 
   function closeAppDialog(value) {

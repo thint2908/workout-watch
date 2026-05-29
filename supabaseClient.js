@@ -263,6 +263,23 @@
     };
   }
 
+  function presetToDb(preset) {
+    return {
+      name: preset.name,
+      items: Array.isArray(preset.items) ? preset.items : []
+    };
+  }
+
+  function dbToPreset(row) {
+    return {
+      id: row.id,
+      name: row.name,
+      items: Array.isArray(row.items) ? row.items : [],
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    };
+  }
+
   function setToDb(set) {
     return {
       session_id: set.sessionId,
@@ -535,6 +552,103 @@
       localSet("exercises", exercises.filter(function (item) {
         return item.id !== exerciseId;
       }));
+    });
+  }
+
+  function listPresets() {
+    return request("workout_presets?select=*&order=name.asc").then(function (rows) {
+      var presets = rows.map(dbToPreset);
+      localSet("presets", presets);
+      return presets;
+    }).catch(function () {
+      if (!isAuthenticated()) {
+        return Promise.reject(new Error("Sign in required."));
+      }
+      return Promise.resolve(localGet("presets", []));
+    });
+  }
+
+  function createPreset(preset) {
+    return request("workout_presets", {
+      method: "POST",
+      headers: headers({ Prefer: "return=representation" }),
+      body: JSON.stringify(presetToDb(preset))
+    }).then(function (rows) {
+      var saved = dbToPreset(rows[0]);
+      var presets = localGet("presets", []);
+      presets.push(saved);
+      localSet("presets", sortPresets(presets));
+      return saved;
+    }).catch(function () {
+      if (!isAuthenticated()) {
+        return Promise.reject(new Error("Sign in required."));
+      }
+      var presets = localGet("presets", []);
+      var saved = Object.assign({}, preset, {
+        id: localId("preset"),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
+      presets.push(saved);
+      localSet("presets", sortPresets(presets));
+      return saved;
+    });
+  }
+
+  function updatePreset(presetId, preset) {
+    return request("workout_presets?id=eq." + encodeURIComponent(presetId), {
+      method: "PATCH",
+      headers: headers({ Prefer: "return=representation" }),
+      body: JSON.stringify(Object.assign(presetToDb(preset), {
+        updated_at: new Date().toISOString()
+      }))
+    }).then(function (rows) {
+      var saved = dbToPreset(rows[0]);
+      var presets = localGet("presets", []);
+      localSet("presets", sortPresets(presets.map(function (item) {
+        return item.id === presetId ? saved : item;
+      })));
+      return saved;
+    }).catch(function () {
+      if (!isAuthenticated()) {
+        return Promise.reject(new Error("Sign in required."));
+      }
+      var presets = localGet("presets", []);
+      var saved = Object.assign({}, preset, {
+        id: presetId,
+        updatedAt: new Date().toISOString()
+      });
+      localSet("presets", sortPresets(presets.map(function (item) {
+        return item.id === presetId ? saved : item;
+      })));
+      return saved;
+    });
+  }
+
+  function deletePreset(presetId) {
+    return request("workout_presets?id=eq." + encodeURIComponent(presetId), {
+      method: "DELETE",
+      headers: headers({ Prefer: "return=minimal" })
+    }).then(function () {
+      removeLocalPreset(presetId);
+    }).catch(function () {
+      if (!isAuthenticated()) {
+        return Promise.reject(new Error("Sign in required."));
+      }
+      removeLocalPreset(presetId);
+    });
+  }
+
+  function removeLocalPreset(presetId) {
+    var presets = localGet("presets", []);
+    localSet("presets", presets.filter(function (preset) {
+      return preset.id !== presetId;
+    }));
+  }
+
+  function sortPresets(presets) {
+    return (presets || []).slice().sort(function (a, b) {
+      return String(a.name || "").localeCompare(String(b.name || ""));
     });
   }
 
@@ -869,7 +983,11 @@
   }
 
   function deleteAllData() {
-    return request("workout_sets?id=not.is.null", { method: "DELETE" }).then(function () {
+    return request("workout_presets?id=not.is.null", { method: "DELETE" }).catch(function () {
+      return null;
+    }).then(function () {
+      return request("workout_sets?id=not.is.null", { method: "DELETE" });
+    }).then(function () {
       return request("workout_sessions?id=not.is.null", { method: "DELETE" });
     }).then(function () {
       return request("exercises?id=not.is.null", { method: "DELETE" });
@@ -881,26 +999,29 @@
       }
       localSet("sessions", []);
       localSet("exercises", window.WorkoutSeed.exercises);
+      localSet("presets", []);
       localStorage.removeItem(LOCAL_PREFIX + "activeWorkout");
       return window.WorkoutSeed.exercises;
     });
   }
 
   function exportData() {
-    return Promise.all([listExercises(), listSessions(), getActiveWorkout()]).then(function (values) {
+    return Promise.all([listExercises(), listSessions(), getActiveWorkout(), listPresets()]).then(function (values) {
       return {
         version: 2,
         exportedAt: new Date().toISOString(),
         source: online ? "supabase" : "local",
         exercises: values[0],
         sessions: values[1],
-        activeWorkout: values[2]
+        activeWorkout: values[2],
+        presets: values[3]
       };
     });
   }
 
   function importData(data) {
     localSet("exercises", Array.isArray(data.exercises) ? data.exercises : window.WorkoutSeed.exercises);
+    localSet("presets", Array.isArray(data.presets) ? data.presets : []);
     localSet("sessions", mergeSessions(localGet("sessions", []), Array.isArray(data.sessions) ? data.sessions : []));
     localSet("pendingSessions", mergeSessions(localGet("pendingSessions", []), Array.isArray(data.sessions) ? data.sessions : []));
     if (data.activeWorkout) {
@@ -930,6 +1051,10 @@
     createExercise: createExercise,
     updateExercise: updateExercise,
     deleteExercise: deleteExercise,
+    listPresets: listPresets,
+    createPreset: createPreset,
+    updatePreset: updatePreset,
+    deletePreset: deletePreset,
     createSession: createSession,
     saveSet: saveSet,
     updateSetRest: updateSetRest,
