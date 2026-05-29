@@ -986,7 +986,17 @@
       WorkoutDb.updateSetRest(lastSet.id, lastSet.restDurationSeconds);
     }
 
-    selectFirstIncompleteWorkoutItem();
+    var completed = completedSetCount(plan);
+    if (completed < plan.sets) {
+      workout.setNumber = completed + 1;
+      workout.status = "ready";
+      workout.setStartedAt = null;
+      workout.setEndsAt = null;
+      workout.restStartedAt = null;
+      workout.restEndsAt = null;
+    } else {
+      selectFirstIncompleteWorkoutItem();
+    }
     persistActiveWorkout().then(function () {
       renderPlayer();
       if (!skipped && currentPlan() && currentPlan().type === "time" && workout.status === "ready") {
