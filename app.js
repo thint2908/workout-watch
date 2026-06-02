@@ -1498,7 +1498,7 @@
       var buttons = row.querySelectorAll("button");
       buttons[0].disabled = index === 0;
       buttons[1].disabled = index === items.length - 1;
-      buttons[2].disabled = complete || (current && workout.status === "working");
+      buttons[2].disabled = current && workout.status === "working";
       buttons[3].disabled = complete || (current && workout.status === "working");
       buttons.forEach(function (button) {
         button.addEventListener("click", function () {
@@ -1623,8 +1623,19 @@
       item.sets = values.sets;
       item.target = values.target;
       item.restSeconds = values.restSeconds;
+      var completedAfterEdit = completedSetCount(item);
+      var hasPendingSets = completedAfterEdit < item.sets;
       if (workout.currentItemId === itemId && workout.setNumber > item.sets) {
-        workout.setNumber = item.sets;
+        workout.setNumber = Math.max(1, item.sets);
+      }
+      if (hasPendingSets && workout.status !== "working" && workout.status !== "resting") {
+        workout.currentItemId = itemId;
+        workout.setNumber = completedAfterEdit + 1;
+        workout.status = "ready";
+        workout.setStartedAt = null;
+        workout.setEndsAt = null;
+        workout.restStartedAt = null;
+        workout.restEndsAt = null;
       }
       persistActiveWorkout().then(function () {
         renderPlayer();
