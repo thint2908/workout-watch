@@ -2074,18 +2074,42 @@
     var maxMinutes = totals.reduce(function (max, item) {
       return Math.max(max, item.minutes);
     }, 0) || 1;
+    var activeDays = totals.filter(function (item) {
+      return item.minutes > 0;
+    }).length;
+    var totalMinutes = totals.reduce(function (sum, item) {
+      return sum + item.minutes;
+    }, 0);
+    var totalWorkouts = totals.reduce(function (sum, item) {
+      return sum + item.workouts;
+    }, 0);
 
-    totals.forEach(function (item) {
+    var meta = document.createElement("div");
+    meta.className = "activity-chart-meta";
+    meta.textContent =
+      activeDays + " active day" + (activeDays === 1 ? "" : "s") +
+      " · " + totalWorkouts + " workout" + (totalWorkouts === 1 ? "" : "s") +
+      " · " + totalMinutes + " min";
+    els.activityChart.appendChild(meta);
+
+    var grid = document.createElement("div");
+    grid.className = "activity-chart-grid";
+
+    totals.forEach(function (item, index) {
       var column = document.createElement("div");
       column.className = "activity-day";
       var height = item.minutes ? Math.max(16, Math.round(item.minutes / maxMinutes * 100)) : 8;
+      var showLabel = index === 0 || index === totals.length - 1 || item.day.getDate() % 5 === 0;
+      column.title =
+        item.day.getDate() + " " + monthLabel +
+        ": " + item.minutes + " min, " + item.workouts + " workout" + (item.workouts === 1 ? "" : "s");
       column.innerHTML =
-        '<span class="activity-value">' + item.minutes + "m</span>" +
-        '<div class="activity-bar-wrap"><span class="activity-bar" style="height:' + height + '%"></span></div>' +
-        '<strong>' + item.day.getDate() + "</strong>" +
-        '<small>' + item.workouts + " workout" + (item.workouts === 1 ? "" : "s") + "</small>";
-      els.activityChart.appendChild(column);
+        '<div class="activity-bar-wrap"><span class="activity-bar' + (item.minutes ? " is-active" : "") + '" style="height:' + height + '%"></span></div>' +
+        '<strong>' + (showLabel ? item.day.getDate() : "&middot;") + "</strong>";
+      grid.appendChild(column);
     });
+
+    els.activityChart.appendChild(grid);
   }
 
   function renderExerciseLeaderboard(stats) {
