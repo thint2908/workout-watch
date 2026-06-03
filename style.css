@@ -534,6 +534,39 @@ td small,
   gap: 8px;
 }
 
+.builder-tools {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+  margin-top: 14px;
+}
+
+.builder-search {
+  display: grid;
+  gap: 6px;
+}
+
+.builder-search span {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.builder-search input {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #111615;
+  color: var(--text);
+  padding: 8px 10px;
+}
+
+.builder-toggle {
+  min-height: 42px;
+}
+
 .chip {
   display: inline-flex;
   align-items: center;
@@ -893,6 +926,11 @@ th {
   .builder-eta {
     grid-template-columns: 1fr;
     gap: 2px;
+  }
+
+  .builder-tools {
+    grid-template-columns: 1fr;
+    align-items: stretch;
   }
 
   .workout-state,

@@ -12,6 +12,8 @@
     activePresetId: null,
     editingExerciseId: null,
     activeWorkout: null,
+    builderSearch: "",
+    builderSelectedOnly: false,
     activeTab: "library",
     tickId: null
   };
@@ -65,6 +67,8 @@
   function cacheElements() {
     els.libraryGrid = document.getElementById("libraryGrid");
     els.bodyPartFilters = document.getElementById("bodyPartFilters");
+    els.builderSearchInput = document.getElementById("builderSearchInput");
+    els.selectedOnlyInput = document.getElementById("selectedOnlyInput");
     els.builderRows = document.getElementById("builderRows");
     els.presetList = document.getElementById("presetList");
     els.savePresetBtn = document.getElementById("savePresetBtn");
@@ -169,6 +173,14 @@
     els.resetBtn.addEventListener("click", resetDemoData);
     els.appDialogForm.addEventListener("submit", submitAppDialog);
     els.appDialogCancelBtn.addEventListener("click", cancelAppDialog);
+    els.builderSearchInput.addEventListener("input", function (event) {
+      state.builderSearch = String(event.target.value || "");
+      renderBuilder();
+    });
+    els.selectedOnlyInput.addEventListener("change", function (event) {
+      state.builderSelectedOnly = event.target.checked;
+      renderBuilder();
+    });
   }
 
   function clone(value) {
@@ -390,10 +402,20 @@
   function renderBuilder() {
     els.builderRows.innerHTML = "";
     var hasActiveWorkout = Boolean(state.activeWorkout);
+    var visibleExercises = filteredExercises();
     els.startWorkoutBtn.textContent = hasActiveWorkout ? "Add to Current Workout" : "Start Workout";
     els.builderNotice.hidden = !hasActiveWorkout;
     els.discardWorkoutBtn.hidden = !hasActiveWorkout;
-    filteredExercises().forEach(function (exercise) {
+    els.builderSearchInput.value = state.builderSearch;
+    els.selectedOnlyInput.checked = state.builderSelectedOnly;
+    if (!visibleExercises.length) {
+      var emptyRow = document.createElement("tr");
+      emptyRow.innerHTML = '<td colspan="7" class="empty-state">No exercises match this filter. Try another body part or search word.</td>';
+      els.builderRows.appendChild(emptyRow);
+      renderBuilderEta();
+      return;
+    }
+    visibleExercises.forEach(function (exercise) {
       if (!state.builder[exercise.id]) {
         state.builder[exercise.id] = {
           selected: false,
@@ -908,9 +930,29 @@
   }
 
   function filteredExercises() {
+    var search = normalizeSearch(state.builderSearch);
     return state.exercises.filter(function (exercise) {
-      return state.selectedBodyParts.indexOf(exercise.bodyPart) >= 0;
+      var config = state.builder[exercise.id];
+      if (state.selectedBodyParts.indexOf(exercise.bodyPart) < 0) {
+        return false;
+      }
+      if (state.builderSelectedOnly && (!config || !config.selected)) {
+        return false;
+      }
+      if (!search) {
+        return true;
+      }
+      return normalizeSearch([
+        exercise.name,
+        exercise.note,
+        exercise.bodyPart,
+        exercise.type === "time" ? "time seconds hold" : "reps strength"
+      ].join(" ")).indexOf(search) >= 0;
     });
+  }
+
+  function normalizeSearch(value) {
+    return String(value || "").trim().toLowerCase();
   }
 
   function cleanNumber(value, fallback) {
