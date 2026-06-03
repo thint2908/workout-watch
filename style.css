@@ -257,6 +257,28 @@ main {
   margin-bottom: 16px;
 }
 
+.stats-period-picker {
+  display: grid;
+  gap: 6px;
+  min-width: 210px;
+}
+
+.stats-period-picker span {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.stats-period-picker select {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #111615;
+  color: var(--text);
+  padding: 8px 10px;
+}
+
 .builder-actions {
   display: flex;
   flex-wrap: wrap;
@@ -731,10 +753,13 @@ th {
 
 .activity-chart {
   display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(48px, 1fr);
   gap: 10px;
   align-items: end;
   min-height: 220px;
+  overflow-x: auto;
+  padding-bottom: 4px;
 }
 
 .activity-day {

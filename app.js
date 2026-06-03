@@ -14,6 +14,7 @@
     activeWorkout: null,
     builderSearch: "",
     builderSelectedOnly: false,
+    statsMonthKey: "",
     activeTab: "library",
     tickId: null
   };
@@ -107,6 +108,9 @@
     els.liveSetLog = document.getElementById("liveSetLog");
     els.sessionList = document.getElementById("sessionList");
     els.weeklyStats = document.getElementById("weeklyStats");
+    els.statsMonthSelect = document.getElementById("statsMonthSelect");
+    els.activityChartKicker = document.getElementById("activityChartKicker");
+    els.activityChartTitle = document.getElementById("activityChartTitle");
     els.activityChart = document.getElementById("activityChart");
     els.exerciseLeaderboard = document.getElementById("exerciseLeaderboard");
     els.exerciseStats = document.getElementById("exerciseStats");
@@ -182,6 +186,10 @@
     els.selectedOnlyInput.addEventListener("change", function (event) {
       state.builderSelectedOnly = event.target.checked;
       renderBuilder();
+    });
+    els.statsMonthSelect.addEventListener("change", function (event) {
+      state.statsMonthKey = event.target.value;
+      renderStats();
     });
   }
 
@@ -1964,11 +1972,14 @@
   }
 
   function renderStats() {
-    var weekStart = startOfWeek(new Date());
-    var weekSessions = state.sessions.filter(function (session) {
-      return new Date(session.startedAt) >= weekStart;
+    syncStatsMonthSelection();
+    renderStatsMonthOptions();
+
+    var selectedMonth = state.statsMonthKey;
+    var monthSessions = state.sessions.filter(function (session) {
+      return monthKeyFor(new Date(session.startedAt)) === selectedMonth;
     });
-    var weekly = weekSessions.reduce(function (acc, session) {
+    var monthly = monthSessions.reduce(function (acc, session) {
       acc.workouts += 1;
       acc.time += session.totalDurationSeconds;
       acc.sets += session.completedSets.length;
@@ -1980,10 +1991,10 @@
 
     els.weeklyStats.innerHTML = "";
     [
-      ["Workouts", weekly.workouts],
-      ["Workout Time", formatTime(weekly.time)],
-      ["Sets", weekly.sets],
-      ["Reps", weekly.reps]
+      ["Workouts", monthly.workouts],
+      ["Workout Time", formatTime(monthly.time)],
+      ["Sets", monthly.sets],
+      ["Reps", monthly.reps]
     ].forEach(function (item) {
       var card = document.createElement("div");
       card.className = "stat-card";
@@ -1991,10 +2002,10 @@
       els.weeklyStats.appendChild(card);
     });
 
-    renderActivityChart();
+    renderActivityChart(selectedMonth, monthSessions);
 
     var stats = {};
-    state.sessions.forEach(function (session) {
+    monthSessions.forEach(function (session) {
       var seen = {};
       session.completedSets.forEach(function (set) {
         if (!stats[set.exerciseId]) {
@@ -2030,23 +2041,25 @@
     });
   }
 
-  function renderActivityChart() {
+  function renderActivityChart(monthKey, monthSessions) {
     if (!els.activityChart) {
       return;
     }
     els.activityChart.innerHTML = "";
 
-    var today = startOfDay(new Date());
+    var monthDate = monthDateFromKey(monthKey);
+    var monthLabel = monthLabelFromKey(monthKey);
+    els.activityChartKicker.textContent = monthLabel;
+    els.activityChartTitle.textContent = "Daily workout activity";
+    var daysInMonth = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0).getDate();
     var days = [];
-    for (var offset = 6; offset >= 0; offset -= 1) {
-      var day = new Date(today);
-      day.setDate(today.getDate() - offset);
-      days.push(day);
+    for (var dayNumber = 1; dayNumber <= daysInMonth; dayNumber += 1) {
+      days.push(new Date(monthDate.getFullYear(), monthDate.getMonth(), dayNumber));
     }
 
     var totals = days.map(function (day) {
       var dayKey = dayKeyFor(day);
-      var daySessions = state.sessions.filter(function (session) {
+      var daySessions = monthSessions.filter(function (session) {
         return dayKeyFor(new Date(session.startedAt)) === dayKey;
       });
       return {
@@ -2069,7 +2082,7 @@
       column.innerHTML =
         '<span class="activity-value">' + item.minutes + "m</span>" +
         '<div class="activity-bar-wrap"><span class="activity-bar" style="height:' + height + '%"></span></div>' +
-        '<strong>' + shortDayLabel(item.day) + "</strong>" +
+        '<strong>' + item.day.getDate() + "</strong>" +
         '<small>' + item.workouts + " workout" + (item.workouts === 1 ? "" : "s") + "</small>";
       els.activityChart.appendChild(column);
     });
@@ -2112,6 +2125,45 @@
         "</div>";
       els.exerciseLeaderboard.appendChild(row);
     });
+  }
+
+  function syncStatsMonthSelection() {
+    var keys = availableStatsMonthKeys();
+    if (!keys.length) {
+      state.statsMonthKey = monthKeyFor(new Date());
+      return;
+    }
+    if (keys.indexOf(state.statsMonthKey) >= 0) {
+      return;
+    }
+    var currentMonth = monthKeyFor(new Date());
+    state.statsMonthKey = keys.indexOf(currentMonth) >= 0 ? currentMonth : keys[0];
+  }
+
+  function renderStatsMonthOptions() {
+    if (!els.statsMonthSelect) {
+      return;
+    }
+    var keys = availableStatsMonthKeys();
+    if (!keys.length) {
+      keys = [monthKeyFor(new Date())];
+    }
+    els.statsMonthSelect.innerHTML = "";
+    keys.forEach(function (key) {
+      var option = document.createElement("option");
+      option.value = key;
+      option.textContent = monthLabelFromKey(key);
+      option.selected = key === state.statsMonthKey;
+      els.statsMonthSelect.appendChild(option);
+    });
+  }
+
+  function availableStatsMonthKeys() {
+    var map = {};
+    state.sessions.forEach(function (session) {
+      map[monthKeyFor(new Date(session.startedAt))] = true;
+    });
+    return Object.keys(map).sort().reverse();
   }
 
   function exportJson() {
@@ -2228,14 +2280,31 @@
     ].join("-");
   }
 
+  function monthKeyFor(date) {
+    return [
+      date.getFullYear(),
+      String(date.getMonth() + 1).padStart(2, "0")
+    ].join("-");
+  }
+
+  function monthDateFromKey(key) {
+    var parts = String(key || "").split("-");
+    var year = Number(parts[0]) || new Date().getFullYear();
+    var month = (Number(parts[1]) || 1) - 1;
+    return new Date(year, month, 1);
+  }
+
+  function monthLabelFromKey(key) {
+    return monthDateFromKey(key).toLocaleDateString([], {
+      month: "long",
+      year: "numeric"
+    });
+  }
+
   function startOfDay(date) {
     var copy = new Date(date);
     copy.setHours(0, 0, 0, 0);
     return copy;
-  }
-
-  function shortDayLabel(date) {
-    return ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][date.getDay()];
   }
 
   function secondsBetween(start, end) {
@@ -2254,15 +2323,6 @@
       dateStyle: "medium",
       timeStyle: "short"
     });
-  }
-
-  function startOfWeek(date) {
-    var copy = new Date(date);
-    var day = copy.getDay();
-    var diff = day === 0 ? -6 : 1 - day;
-    copy.setDate(copy.getDate() + diff);
-    copy.setHours(0, 0, 0, 0);
-    return copy;
   }
 
   function beep() {
