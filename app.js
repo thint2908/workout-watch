@@ -15,6 +15,8 @@
     builderSearch: "",
     builderSelectedOnly: false,
     statsMonthKey: "",
+    analysisExerciseId: "",
+    analysisRange: "30",
     activeTab: "library",
     tickId: null
   };
@@ -114,6 +116,17 @@
     els.activityChart = document.getElementById("activityChart");
     els.exerciseLeaderboard = document.getElementById("exerciseLeaderboard");
     els.exerciseStats = document.getElementById("exerciseStats");
+    els.analysisExerciseSelect = document.getElementById("analysisExerciseSelect");
+    els.analysisRangeSelect = document.getElementById("analysisRangeSelect");
+    els.analysisSummary = document.getElementById("analysisSummary");
+    els.analysisChartKicker = document.getElementById("analysisChartKicker");
+    els.analysisChartTitle = document.getElementById("analysisChartTitle");
+    els.analysisMetricLabel = document.getElementById("analysisMetricLabel");
+    els.analysisChartEmpty = document.getElementById("analysisChartEmpty");
+    els.analysisChartScroll = document.getElementById("analysisChartScroll");
+    els.analysisChart = document.getElementById("analysisChart");
+    els.analysisRecords = document.getElementById("analysisRecords");
+    els.analysisSessions = document.getElementById("analysisSessions");
     els.toast = document.getElementById("toast");
     els.versionBadge = document.getElementById("versionBadge");
     els.modeWarning = document.getElementById("modeWarning");
@@ -191,6 +204,14 @@
       state.statsMonthKey = event.target.value;
       renderStats();
     });
+    els.analysisExerciseSelect.addEventListener("change", function (event) {
+      state.analysisExerciseId = event.target.value;
+      renderAnalysis();
+    });
+    els.analysisRangeSelect.addEventListener("change", function (event) {
+      state.analysisRange = event.target.value;
+      renderAnalysis();
+    });
   }
 
   function clone(value) {
@@ -249,6 +270,7 @@
       renderPlayer();
       renderLog();
       renderStats();
+      renderAnalysis();
       showToast("Signed out.");
     });
   }
@@ -262,6 +284,7 @@
       state.sessions = sessions || [];
       renderLog();
       renderStats();
+      renderAnalysis();
       updateModeWarning();
     });
   }
@@ -327,6 +350,7 @@
     renderPlayer();
     renderLog();
     renderStats();
+    renderAnalysis();
   }
 
   function renderVersionBadge() {
@@ -2180,6 +2204,405 @@
       option.textContent = monthLabelFromKey(key);
       option.selected = key === state.statsMonthKey;
       els.statsMonthSelect.appendChild(option);
+    });
+  }
+
+  function renderAnalysis() {
+    if (!els.analysisExerciseSelect) {
+      return;
+    }
+    var catalog = analysisExerciseCatalog();
+    syncAnalysisSelection(catalog);
+    renderAnalysisOptions(catalog);
+    els.analysisRangeSelect.value = state.analysisRange;
+
+    if (!catalog.length || !state.analysisExerciseId) {
+      renderEmptyAnalysis();
+      return;
+    }
+
+    var analysis = buildAnalysisSeries(state.analysisExerciseId, state.analysisRange);
+    renderAnalysisSummary(analysis);
+    renderAnalysisChart(analysis);
+    renderAnalysisRecords(analysis);
+    renderAnalysisSessions(analysis);
+  }
+
+  function analysisExerciseCatalog() {
+    var catalog = {};
+    state.sessions.forEach(function (session) {
+      session.completedSets.forEach(function (set) {
+        if (!catalog[set.exerciseId]) {
+          catalog[set.exerciseId] = {
+            id: set.exerciseId,
+            name: set.exerciseName,
+            type: set.type
+          };
+        }
+      });
+    });
+    return Object.keys(catalog).map(function (key) {
+      return catalog[key];
+    }).sort(function (a, b) {
+      return a.name.localeCompare(b.name);
+    });
+  }
+
+  function syncAnalysisSelection(catalog) {
+    if (!catalog.length) {
+      state.analysisExerciseId = "";
+      return;
+    }
+    var exists = catalog.some(function (item) {
+      return item.id === state.analysisExerciseId;
+    });
+    if (!exists) {
+      state.analysisExerciseId = catalog[0].id;
+    }
+  }
+
+  function renderAnalysisOptions(catalog) {
+    els.analysisExerciseSelect.innerHTML = "";
+    if (!catalog.length) {
+      var emptyOption = document.createElement("option");
+      emptyOption.value = "";
+      emptyOption.textContent = "No exercise data yet";
+      els.analysisExerciseSelect.appendChild(emptyOption);
+      return;
+    }
+    catalog.forEach(function (item) {
+      var option = document.createElement("option");
+      option.value = item.id;
+      option.textContent = item.name;
+      option.selected = item.id === state.analysisExerciseId;
+      els.analysisExerciseSelect.appendChild(option);
+    });
+  }
+
+  function buildAnalysisSeries(exerciseId, range) {
+    var relevantSessions = state.sessions.filter(function (session) {
+      return session.completedSets.some(function (set) {
+        return set.exerciseId === exerciseId;
+      });
+    });
+    var exerciseSets = [];
+    relevantSessions.forEach(function (session) {
+      session.completedSets.forEach(function (set) {
+        if (set.exerciseId === exerciseId) {
+          exerciseSets.push({
+            sessionId: session.id,
+            startedAt: session.startedAt,
+            finishedAt: session.finishedAt,
+            set: set
+          });
+        }
+      });
+    });
+
+    var type = exerciseSets[0] ? exerciseSets[0].set.type : "reps";
+    var filteredSessions = filterSessionsByRange(relevantSessions, range);
+    var sessionLookup = {};
+    filteredSessions.forEach(function (session) {
+      sessionLookup[session.id] = true;
+    });
+
+    var filteredSets = exerciseSets.filter(function (entry) {
+      return sessionLookup[entry.sessionId];
+    }).sort(function (a, b) {
+      return new Date(a.startedAt) - new Date(b.startedAt);
+    });
+
+    var dayMap = {};
+    filteredSets.forEach(function (entry) {
+      var key = dayKeyFor(new Date(entry.startedAt));
+      if (!dayMap[key]) {
+        dayMap[key] = {
+          day: startOfDay(new Date(entry.startedAt)),
+          volume: 0,
+          sets: 0,
+          sessions: {}
+        };
+      }
+      var value = analysisVolumeForSet(entry.set);
+      dayMap[key].volume += value;
+      dayMap[key].sets += 1;
+      dayMap[key].sessions[entry.sessionId] = true;
+    });
+
+    var rangeDays = analysisRangeDays(range, filteredSets);
+    var points = rangeDays.map(function (day) {
+      var key = dayKeyFor(day);
+      var row = dayMap[key];
+      return {
+        day: day,
+        volume: row ? row.volume : 0,
+        sets: row ? row.sets : 0,
+        sessions: row ? Object.keys(row.sessions).length : 0
+      };
+    });
+
+    var stats = {
+      totalVolume: filteredSets.reduce(function (sum, entry) {
+        return sum + analysisVolumeForSet(entry.set);
+      }, 0),
+      totalSets: filteredSets.length,
+      sessions: filteredSessions.length,
+      bestSingleSet: filteredSets.reduce(function (best, entry) {
+        return Math.max(best, analysisVolumeForSet(entry.set));
+      }, 0),
+      bestDayVolume: points.reduce(function (best, item) {
+        return Math.max(best, item.volume);
+      }, 0),
+      bestDaySets: points.reduce(function (best, item) {
+        return Math.max(best, item.sets);
+      }, 0)
+    };
+
+    var sessionSummaries = filteredSessions.map(function (session) {
+      var sets = session.completedSets.filter(function (set) {
+        return set.exerciseId === exerciseId;
+      });
+      return {
+        id: session.id,
+        startedAt: session.startedAt,
+        volume: sets.reduce(function (sum, set) {
+          return sum + analysisVolumeForSet(set);
+        }, 0),
+        sets: sets.length
+      };
+    }).filter(function (item) {
+      return item.sets > 0;
+    }).sort(function (a, b) {
+      return new Date(b.startedAt) - new Date(a.startedAt);
+    }).slice(0, 6);
+
+    return {
+      exerciseId: exerciseId,
+      exerciseName: exerciseSets[0] ? exerciseSets[0].set.exerciseName : "Exercise",
+      type: type,
+      range: range,
+      points: points,
+      stats: stats,
+      sessionSummaries: sessionSummaries,
+      trend: analysisTrend(points)
+    };
+  }
+
+  function renderEmptyAnalysis() {
+    els.analysisSummary.innerHTML = '<div class="stat-card"><span>Analysis</span><strong>No data yet</strong></div>';
+    els.analysisChartKicker.textContent = "Analysis";
+    els.analysisChartTitle.textContent = "Exercise progression";
+    els.analysisMetricLabel.textContent = "Volume";
+    els.analysisChartEmpty.hidden = false;
+    els.analysisChartEmpty.textContent = "Complete some workouts to unlock exercise analysis.";
+    els.analysisChart.setAttribute("viewBox", "0 0 10 10");
+    els.analysisChart.innerHTML = "";
+    els.analysisRecords.innerHTML = '<p class="empty-state">No records yet.</p>';
+    els.analysisSessions.innerHTML = '<p class="empty-state">No sessions yet.</p>';
+  }
+
+  function renderAnalysisSummary(analysis) {
+    var unitLabel = analysis.type === "time" ? "sec" : "reps";
+    els.analysisSummary.innerHTML = "";
+    [
+      ["Total volume", analysis.stats.totalVolume + " " + unitLabel],
+      ["Total sets", analysis.stats.totalSets],
+      ["Sessions", analysis.stats.sessions],
+      ["Trend", analysis.trend.label]
+    ].forEach(function (item) {
+      var card = document.createElement("div");
+      card.className = "stat-card";
+      card.innerHTML = "<span>" + item[0] + "</span><strong>" + item[1] + "</strong>";
+      els.analysisSummary.appendChild(card);
+    });
+  }
+
+  function renderAnalysisChart(analysis) {
+    var activePoints = analysis.points.filter(function (point) {
+      return point.volume > 0 || point.sets > 0;
+    });
+    els.analysisMetricLabel.textContent = analysis.type === "time" ? "Seconds" : "Reps";
+    els.analysisChartKicker.textContent = rangeLabel(analysis.range);
+    els.analysisChartTitle.textContent = analysis.exerciseName + " progression";
+    if (!activePoints.length) {
+      els.analysisChartEmpty.hidden = false;
+      els.analysisChartEmpty.textContent = "No " + analysis.exerciseName + " data for this range yet.";
+      els.analysisChart.innerHTML = "";
+      els.analysisChart.setAttribute("viewBox", "0 0 10 10");
+      return;
+    }
+
+    els.analysisChartEmpty.hidden = true;
+    var width = Math.max(720, analysis.points.length * 34);
+    var height = 260;
+    var padding = { top: 24, right: 20, bottom: 42, left: 20 };
+    var chartHeight = height - padding.top - padding.bottom;
+    var chartWidth = width - padding.left - padding.right;
+    var maxVolume = Math.max.apply(null, analysis.points.map(function (point) { return point.volume; })) || 1;
+    var maxSets = Math.max.apply(null, analysis.points.map(function (point) { return point.sets; })) || 1;
+    var interval = analysis.points.length <= 10 ? 1 : analysis.points.length <= 20 ? 2 : analysis.points.length <= 45 ? 5 : 7;
+
+    var volumePath = [];
+    var setsPath = [];
+    var svg = [];
+    svg.push('<rect x="0" y="0" width="' + width + '" height="' + height + '" rx="12" fill="transparent"></rect>');
+
+    for (var i = 0; i < 4; i += 1) {
+      var gridY = padding.top + (chartHeight / 3) * i;
+      svg.push('<line x1="' + padding.left + '" y1="' + gridY + '" x2="' + (width - padding.right) + '" y2="' + gridY + '" stroke="rgba(170,184,175,0.12)" stroke-width="1"></line>');
+    }
+
+    analysis.points.forEach(function (point, index) {
+      var x = padding.left + (analysis.points.length === 1 ? chartWidth / 2 : (chartWidth / (analysis.points.length - 1)) * index);
+      var volumeY = padding.top + chartHeight - (point.volume / maxVolume) * chartHeight;
+      var setsY = padding.top + chartHeight - (point.sets / maxSets) * chartHeight;
+      volumePath.push((index ? "L" : "M") + x.toFixed(2) + " " + volumeY.toFixed(2));
+      setsPath.push((index ? "L" : "M") + x.toFixed(2) + " " + setsY.toFixed(2));
+      if (point.volume || point.sets) {
+        svg.push('<circle cx="' + x.toFixed(2) + '" cy="' + volumeY.toFixed(2) + '" r="4" fill="#44d17a"><title>' +
+          escapeHtml(formatDateLabel(point.day) + " · " + point.volume + " " + (analysis.type === "time" ? "sec" : "reps") + " · " + point.sets + " sets") +
+          '</title></circle>');
+        svg.push('<circle cx="' + x.toFixed(2) + '" cy="' + setsY.toFixed(2) + '" r="3" fill="#5bb6ff"></circle>');
+      }
+      if (index % interval === 0 || index === analysis.points.length - 1) {
+        svg.push('<text x="' + x.toFixed(2) + '" y="' + (height - 14) + '" fill="#aab8af" font-size="11" text-anchor="middle">' +
+          escapeHtml(shortDateLabel(point.day)) + "</text>");
+      }
+    });
+
+    svg.push('<path d="' + volumePath.join(" ") + '" fill="none" stroke="#44d17a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path>');
+    svg.push('<path d="' + setsPath.join(" ") + '" fill="none" stroke="#5bb6ff" stroke-width="2" stroke-dasharray="4 4" stroke-linecap="round" stroke-linejoin="round"></path>');
+    els.analysisChart.setAttribute("viewBox", "0 0 " + width + " " + height);
+    els.analysisChart.setAttribute("width", width);
+    els.analysisChart.setAttribute("height", height);
+    els.analysisChart.innerHTML = svg.join("");
+  }
+
+  function renderAnalysisRecords(analysis) {
+    var unitLabel = analysis.type === "time" ? "sec" : "reps";
+    els.analysisRecords.innerHTML = "";
+    [
+      ["Best single set", analysis.stats.bestSingleSet + " " + unitLabel],
+      ["Best day volume", analysis.stats.bestDayVolume + " " + unitLabel],
+      ["Most sets in a day", analysis.stats.bestDaySets + " sets"],
+      ["Range", rangeLabel(analysis.range)]
+    ].forEach(function (item) {
+      var card = document.createElement("div");
+      card.className = "analysis-record-card";
+      card.innerHTML = "<span>" + item[0] + "</span><strong>" + item[1] + "</strong>";
+      els.analysisRecords.appendChild(card);
+    });
+  }
+
+  function renderAnalysisSessions(analysis) {
+    els.analysisSessions.innerHTML = "";
+    if (!analysis.sessionSummaries.length) {
+      els.analysisSessions.innerHTML = '<p class="empty-state">No sessions in this range yet.</p>';
+      return;
+    }
+    analysis.sessionSummaries.forEach(function (session) {
+      var row = document.createElement("div");
+      row.className = "analysis-session-row";
+      row.innerHTML =
+        "<strong>" + escapeHtml(formatDateLabel(new Date(session.startedAt))) + "</strong>" +
+        "<small>" + session.volume + " " + (analysis.type === "time" ? "sec" : "reps") + " · " + session.sets + " sets</small>";
+      els.analysisSessions.appendChild(row);
+    });
+  }
+
+  function analysisRangeDays(range, filteredSets) {
+    if (!filteredSets.length) {
+      var today = startOfDay(new Date());
+      return [today];
+    }
+    var lastDate = startOfDay(new Date(filteredSets[filteredSets.length - 1].startedAt));
+    var firstDate = startOfDay(new Date(filteredSets[0].startedAt));
+    var startDate;
+    if (range === "all") {
+      startDate = firstDate;
+    } else {
+      startDate = startOfDay(new Date(lastDate));
+      startDate.setDate(startDate.getDate() - (Number(range) - 1));
+      if (startDate < firstDate) {
+        startDate = firstDate;
+      }
+    }
+    var days = [];
+    var cursor = new Date(startDate);
+    while (cursor <= lastDate) {
+      days.push(new Date(cursor));
+      cursor.setDate(cursor.getDate() + 1);
+    }
+    return days;
+  }
+
+  function filterSessionsByRange(sessions, range) {
+    if (range === "all") {
+      return sessions.slice().sort(function (a, b) {
+        return new Date(a.startedAt) - new Date(b.startedAt);
+      });
+    }
+    var latest = sessions.reduce(function (max, session) {
+      return Math.max(max, new Date(session.startedAt).getTime());
+    }, 0);
+    var start = startOfDay(new Date(latest));
+    start.setDate(start.getDate() - (Number(range) - 1));
+    return sessions.filter(function (session) {
+      return new Date(session.startedAt) >= start;
+    }).sort(function (a, b) {
+      return new Date(a.startedAt) - new Date(b.startedAt);
+    });
+  }
+
+  function analysisVolumeForSet(set) {
+    if (set.type === "time") {
+      return Number(set.setDurationSeconds || set.target || 0);
+    }
+    return Number(set.reps || set.target || 0);
+  }
+
+  function analysisTrend(points) {
+    var active = points.filter(function (point) {
+      return point.volume > 0;
+    });
+    if (active.length < 2) {
+      return { label: "Building baseline" };
+    }
+    var recent = active.slice(-3);
+    var previous = active.slice(-6, -3);
+    if (!previous.length) {
+      return { label: "Early progress" };
+    }
+    var recentAvg = averageBy(recent, "volume");
+    var previousAvg = averageBy(previous, "volume");
+    if (recentAvg > previousAvg * 1.08) {
+      return { label: "Improving" };
+    }
+    if (recentAvg < previousAvg * 0.92) {
+      return { label: "Down" };
+    }
+    return { label: "Flat" };
+  }
+
+  function averageBy(items, key) {
+    return items.reduce(function (sum, item) {
+      return sum + Number(item[key] || 0);
+    }, 0) / (items.length || 1);
+  }
+
+  function rangeLabel(range) {
+    return range === "all" ? "All time" : "Last " + range + " days";
+  }
+
+  function shortDateLabel(date) {
+    return (date.getMonth() + 1) + "/" + date.getDate();
+  }
+
+  function formatDateLabel(date) {
+    return new Date(date).toLocaleDateString([], {
+      month: "short",
+      day: "numeric",
+      year: "numeric"
     });
   }
 

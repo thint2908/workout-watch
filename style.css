@@ -189,7 +189,7 @@ h3 {
   top: 0;
   z-index: 3;
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(6, 1fr);
   gap: 6px;
   padding: 8px 0;
   background: rgba(17, 20, 19, 0.92);
@@ -277,6 +277,13 @@ main {
   background: #111615;
   color: var(--text);
   padding: 8px 10px;
+}
+
+.analysis-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
 }
 
 .builder-actions {
@@ -732,6 +739,14 @@ th {
   margin-top: 16px;
 }
 
+.analysis-summary,
+.analysis-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+
 .stats-panel-wide {
   width: 100%;
 }
@@ -822,6 +837,89 @@ th {
   font-size: 0.72rem;
   color: var(--muted);
   text-align: center;
+}
+
+.analysis-chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-bottom: 10px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.analysis-chart-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.legend-dot {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+}
+
+.legend-dot-primary {
+  background: var(--primary);
+}
+
+.legend-dot-secondary {
+  background: var(--accent);
+}
+
+.analysis-chart-shell {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel-2);
+  overflow: hidden;
+}
+
+.analysis-chart-empty {
+  padding: 18px;
+  color: var(--muted);
+}
+
+.analysis-chart-scroll {
+  overflow-x: auto;
+  padding: 10px;
+}
+
+.analysis-chart-scroll svg {
+  display: block;
+}
+
+.analysis-records {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.analysis-record-card,
+.analysis-session-row {
+  padding: 12px;
+  border-radius: 8px;
+  background: var(--panel-2);
+}
+
+.analysis-record-card span,
+.analysis-session-row small {
+  display: block;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.analysis-record-card strong,
+.analysis-session-row strong {
+  display: block;
+  margin-top: 4px;
+}
+
+.analysis-sessions {
+  display: grid;
+  gap: 10px;
 }
 
 .leaderboard-list {
@@ -1088,7 +1186,7 @@ th {
   }
 
   .tabs {
-    grid-template-columns: repeat(5, minmax(58px, 1fr));
+    grid-template-columns: repeat(6, minmax(58px, 1fr));
     gap: 4px;
   }
 
@@ -1108,10 +1206,17 @@ th {
     align-items: stretch;
   }
 
+  .analysis-controls {
+    width: 100%;
+  }
+
   .workout-state,
   .active-timers,
   .weekly-grid,
   .stats-visual-grid,
+  .analysis-summary,
+  .analysis-grid,
+  .analysis-records,
   .leaderboard-list,
   .form-grid,
   .big-actions {

@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Workout Watch</title>
-    <link rel="stylesheet" href="style.css?v=20260603-stats-layout-2">
+    <link rel="stylesheet" href="style.css?v=20260603-analysis-tab">
   </head>
   <body>
     <header class="app-header">
@@ -30,6 +30,7 @@
       <button class="tab-btn" data-tab="player" type="button">Timer</button>
       <button class="tab-btn" data-tab="log" type="button">Log</button>
       <button class="tab-btn" data-tab="stats" type="button">Stats</button>
+      <button class="tab-btn" data-tab="analysis" type="button">Analysis</button>
     </nav>
 
     <section class="auth-panel" id="authPanel">
@@ -239,6 +240,73 @@
           </table>
         </div>
       </section>
+
+      <section class="panel" id="analysisPanel">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Analysis</p>
+            <h2>Exercise progression</h2>
+          </div>
+          <div class="analysis-controls">
+            <label class="stats-period-picker" for="analysisExerciseSelect">
+              <span>Exercise</span>
+              <select id="analysisExerciseSelect"></select>
+            </label>
+            <label class="stats-period-picker" for="analysisRangeSelect">
+              <span>Range</span>
+              <select id="analysisRangeSelect">
+                <option value="7">Last 7 days</option>
+                <option value="30" selected>Last 30 days</option>
+                <option value="90">Last 90 days</option>
+                <option value="all">All time</option>
+              </select>
+            </label>
+          </div>
+        </div>
+
+        <div class="analysis-summary" id="analysisSummary"></div>
+
+        <section class="stats-panel">
+          <div class="stats-panel-heading">
+            <div>
+              <p class="field-label" id="analysisChartKicker">Progress chart</p>
+              <h3 id="analysisChartTitle">Daily volume and sets</h3>
+            </div>
+          </div>
+          <div class="analysis-chart-legend">
+            <span><i class="legend-dot legend-dot-primary"></i><strong id="analysisMetricLabel">Volume</strong></span>
+            <span><i class="legend-dot legend-dot-secondary"></i>Sets</span>
+          </div>
+          <div class="analysis-chart-shell">
+            <div class="analysis-chart-empty" id="analysisChartEmpty" hidden>No data for this range yet.</div>
+            <div class="analysis-chart-scroll" id="analysisChartScroll">
+              <svg id="analysisChart" aria-label="Exercise progression chart"></svg>
+            </div>
+          </div>
+        </section>
+
+        <div class="analysis-grid">
+          <section class="stats-panel">
+            <div class="stats-panel-heading">
+              <div>
+                <p class="field-label">Best record</p>
+                <h3>Personal bests</h3>
+              </div>
+            </div>
+            <div class="analysis-records" id="analysisRecords"></div>
+          </section>
+
+          <section class="stats-panel">
+            <div class="stats-panel-heading">
+              <div>
+                <p class="field-label">Recent sessions</p>
+                <h3>Latest exercise sessions</h3>
+              </div>
+            </div>
+            <div class="analysis-sessions" id="analysisSessions"></div>
+          </section>
+        </div>
+      </section>
     </main>
 
     <div class="modal-backdrop" id="exerciseModal" hidden>
@@ -327,6 +395,6 @@
     <script src="seed.js?v=20260526-auth" defer></script>
     <script src="supabaseClient.js?v=20260529-presets" defer></script>
     <script src="version.js?v=auto" defer></script>
-    <script src="app.js?v=20260603-stats-layout-2" defer></script>
+    <script src="app.js?v=20260603-analysis-tab" defer></script>
   </body>
 </html>
