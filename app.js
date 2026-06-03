@@ -2434,8 +2434,8 @@
 
     els.analysisChartEmpty.hidden = true;
     var width = Math.max(720, analysis.points.length * 34);
-    var height = 260;
-    var padding = { top: 24, right: 20, bottom: 42, left: 20 };
+    var height = 280;
+    var padding = { top: 30, right: 44, bottom: 46, left: 44 };
     var chartHeight = height - padding.top - padding.bottom;
     var chartWidth = width - padding.left - padding.right;
     var maxVolume = Math.max.apply(null, analysis.points.map(function (point) { return point.volume; })) || 1;
@@ -2450,7 +2450,21 @@
     for (var i = 0; i < 4; i += 1) {
       var gridY = padding.top + (chartHeight / 3) * i;
       svg.push('<line x1="' + padding.left + '" y1="' + gridY + '" x2="' + (width - padding.right) + '" y2="' + gridY + '" stroke="rgba(170,184,175,0.12)" stroke-width="1"></line>');
+      var volumeTick = Math.round(maxVolume - (maxVolume / 3) * i);
+      var setsTick = Math.round(maxSets - (maxSets / 3) * i);
+      svg.push('<text x="' + (padding.left - 10) + '" y="' + (gridY + 4) + '" fill="#aab8af" font-size="11" text-anchor="end">' +
+        escapeHtml(String(Math.max(0, volumeTick))) + "</text>");
+      svg.push('<text x="' + (width - padding.right + 10) + '" y="' + (gridY + 4) + '" fill="#7ec4ff" font-size="11" text-anchor="start">' +
+        escapeHtml(String(Math.max(0, setsTick))) + "</text>");
     }
+
+    var labeledPointIndexes = {};
+    activePoints.forEach(function (point) {
+      var index = analysis.points.indexOf(point);
+      if (analysis.points.length <= 10 || point.volume === maxVolume || point.sets === maxSets || index === analysis.points.length - 1) {
+        labeledPointIndexes[index] = true;
+      }
+    });
 
     analysis.points.forEach(function (point, index) {
       var x = padding.left + (analysis.points.length === 1 ? chartWidth / 2 : (chartWidth / (analysis.points.length - 1)) * index);
@@ -2463,6 +2477,12 @@
           escapeHtml(formatDateLabel(point.day) + " · " + point.volume + " " + (analysis.type === "time" ? "sec" : "reps") + " · " + point.sets + " sets") +
           '</title></circle>');
         svg.push('<circle cx="' + x.toFixed(2) + '" cy="' + setsY.toFixed(2) + '" r="3" fill="#5bb6ff"></circle>');
+        if (labeledPointIndexes[index]) {
+          svg.push('<text x="' + x.toFixed(2) + '" y="' + (volumeY - 10).toFixed(2) + '" fill="#f2f7f3" font-size="11" font-weight="700" text-anchor="middle">' +
+            escapeHtml(String(point.volume)) + "</text>");
+          svg.push('<text x="' + x.toFixed(2) + '" y="' + (setsY - 10).toFixed(2) + '" fill="#7ec4ff" font-size="10" font-weight="700" text-anchor="middle">' +
+            escapeHtml(String(point.sets) + "s") + "</text>");
+        }
       }
       if (index % interval === 0 || index === analysis.points.length - 1) {
         svg.push('<text x="' + x.toFixed(2) + '" y="' + (height - 14) + '" fill="#aab8af" font-size="11" text-anchor="middle">' +
