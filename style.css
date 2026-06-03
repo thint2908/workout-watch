@@ -726,10 +726,14 @@ th {
 
 .stats-visual-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.45fr) minmax(260px, 0.85fr);
+  grid-template-columns: 1fr;
   gap: 16px;
   align-items: start;
   margin-top: 16px;
+}
+
+.stats-panel-wide {
+  width: 100%;
 }
 
 .stats-panel {
@@ -767,10 +771,10 @@ th {
 .activity-chart-grid {
   display: grid;
   grid-auto-flow: column;
-  grid-auto-columns: minmax(18px, 24px);
-  gap: 4px;
+  grid-auto-columns: minmax(20px, 28px);
+  gap: 6px;
   align-items: end;
-  min-height: 154px;
+  min-height: 178px;
   overflow-x: auto;
   padding: 2px 0 6px;
 }
@@ -781,12 +785,20 @@ th {
   justify-items: center;
 }
 
+.activity-value {
+  min-height: 16px;
+  color: var(--text);
+  font-size: 0.7rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
 .activity-bar-wrap {
   display: flex;
   align-items: end;
   justify-content: center;
   width: 100%;
-  min-height: 112px;
+  min-height: 124px;
   padding: 6px 0;
   border-radius: 10px;
   background: rgba(91, 182, 255, 0.06);
@@ -814,6 +826,7 @@ th {
 
 .leaderboard-list {
   display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
 }
 
@@ -1099,6 +1112,7 @@ th {
   .active-timers,
   .weekly-grid,
   .stats-visual-grid,
+  .leaderboard-list,
   .form-grid,
   .big-actions {
     grid-template-columns: 1fr;

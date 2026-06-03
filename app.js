@@ -2104,6 +2104,7 @@
         item.day.getDate() + " " + monthLabel +
         ": " + item.minutes + " min, " + item.workouts + " workout" + (item.workouts === 1 ? "" : "s");
       column.innerHTML =
+        '<span class="activity-value">' + (item.minutes ? item.minutes + "m" : "") + "</span>" +
         '<div class="activity-bar-wrap"><span class="activity-bar' + (item.minutes ? " is-active" : "") + '" style="height:' + height + '%"></span></div>' +
         '<strong>' + (showLabel ? item.day.getDate() : "&middot;") + "</strong>";
       grid.appendChild(column);
