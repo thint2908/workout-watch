@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Workout Watch</title>
-    <link rel="stylesheet" href="style.css?v=20260603-builder-search">
+    <link rel="stylesheet" href="style.css?v=20260603-stats-visuals">
   </head>
   <body>
     <header class="app-header">
@@ -199,6 +199,27 @@
           </div>
         </div>
         <div class="weekly-grid" id="weeklyStats"></div>
+        <div class="stats-visual-grid">
+          <section class="stats-panel">
+            <div class="stats-panel-heading">
+              <div>
+                <p class="field-label">7 day activity</p>
+                <h3>Daily workout streak</h3>
+              </div>
+            </div>
+            <div class="activity-chart" id="activityChart"></div>
+          </section>
+
+          <section class="stats-panel">
+            <div class="stats-panel-heading">
+              <div>
+                <p class="field-label">Most trained</p>
+                <h3>Top exercises by sets</h3>
+              </div>
+            </div>
+            <div class="leaderboard-list" id="exerciseLeaderboard"></div>
+          </section>
+        </div>
         <div class="table-wrap">
           <table>
             <thead>
@@ -302,6 +323,6 @@
     <script src="seed.js?v=20260526-auth" defer></script>
     <script src="supabaseClient.js?v=20260529-presets" defer></script>
     <script src="version.js?v=auto" defer></script>
-    <script src="app.js?v=20260603-builder-search" defer></script>
+    <script src="app.js?v=20260603-stats-visuals" defer></script>
   </body>
 </html>

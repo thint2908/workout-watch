@@ -107,6 +107,8 @@
     els.liveSetLog = document.getElementById("liveSetLog");
     els.sessionList = document.getElementById("sessionList");
     els.weeklyStats = document.getElementById("weeklyStats");
+    els.activityChart = document.getElementById("activityChart");
+    els.exerciseLeaderboard = document.getElementById("exerciseLeaderboard");
     els.exerciseStats = document.getElementById("exerciseStats");
     els.toast = document.getElementById("toast");
     els.versionBadge = document.getElementById("versionBadge");
@@ -1989,6 +1991,8 @@
       els.weeklyStats.appendChild(card);
     });
 
+    renderActivityChart();
+
     var stats = {};
     state.sessions.forEach(function (session) {
       var seen = {};
@@ -2006,6 +2010,8 @@
       });
     });
 
+    renderExerciseLeaderboard(stats);
+
     els.exerciseStats.innerHTML = "";
     var rows = Object.keys(stats).map(function (key) { return stats[key]; });
     if (!rows.length) {
@@ -2021,6 +2027,90 @@
         "<td>" + formatTime(stat.time) + "</td>" +
         "<td>" + stat.sessions + "</td>";
       els.exerciseStats.appendChild(row);
+    });
+  }
+
+  function renderActivityChart() {
+    if (!els.activityChart) {
+      return;
+    }
+    els.activityChart.innerHTML = "";
+
+    var today = startOfDay(new Date());
+    var days = [];
+    for (var offset = 6; offset >= 0; offset -= 1) {
+      var day = new Date(today);
+      day.setDate(today.getDate() - offset);
+      days.push(day);
+    }
+
+    var totals = days.map(function (day) {
+      var dayKey = dayKeyFor(day);
+      var daySessions = state.sessions.filter(function (session) {
+        return dayKeyFor(new Date(session.startedAt)) === dayKey;
+      });
+      return {
+        day: day,
+        workouts: daySessions.length,
+        minutes: Math.round(daySessions.reduce(function (sum, session) {
+          return sum + Number(session.totalDurationSeconds || 0);
+        }, 0) / 60)
+      };
+    });
+
+    var maxMinutes = totals.reduce(function (max, item) {
+      return Math.max(max, item.minutes);
+    }, 0) || 1;
+
+    totals.forEach(function (item) {
+      var column = document.createElement("div");
+      column.className = "activity-day";
+      var height = item.minutes ? Math.max(16, Math.round(item.minutes / maxMinutes * 100)) : 8;
+      column.innerHTML =
+        '<span class="activity-value">' + item.minutes + "m</span>" +
+        '<div class="activity-bar-wrap"><span class="activity-bar" style="height:' + height + '%"></span></div>' +
+        '<strong>' + shortDayLabel(item.day) + "</strong>" +
+        '<small>' + item.workouts + " workout" + (item.workouts === 1 ? "" : "s") + "</small>";
+      els.activityChart.appendChild(column);
+    });
+  }
+
+  function renderExerciseLeaderboard(stats) {
+    if (!els.exerciseLeaderboard) {
+      return;
+    }
+    els.exerciseLeaderboard.innerHTML = "";
+    var rows = Object.keys(stats).map(function (key) {
+      return stats[key];
+    }).sort(function (a, b) {
+      if (b.sets !== a.sets) {
+        return b.sets - a.sets;
+      }
+      return a.name.localeCompare(b.name);
+    }).slice(0, 5);
+
+    if (!rows.length) {
+      els.exerciseLeaderboard.textContent = "Complete a workout to see your most trained exercises.";
+      els.exerciseLeaderboard.classList.add("empty-state");
+      return;
+    }
+
+    els.exerciseLeaderboard.classList.remove("empty-state");
+    var maxSets = rows.reduce(function (max, item) {
+      return Math.max(max, item.sets);
+    }, 1);
+
+    rows.forEach(function (item, index) {
+      var row = document.createElement("div");
+      row.className = "leaderboard-row";
+      row.innerHTML =
+        '<span class="leaderboard-rank">#' + (index + 1) + "</span>" +
+        '<div class="leaderboard-main">' +
+        "<strong>" + escapeHtml(item.name) + "</strong>" +
+        "<small>" + item.sets + " sets · " + item.sessions + " sessions · " + item.reps + " reps</small>" +
+        '<div class="leaderboard-bar"><span style="width:' + Math.max(14, Math.round(item.sets / maxSets * 100)) + '%"></span></div>' +
+        "</div>";
+      els.exerciseLeaderboard.appendChild(row);
     });
   }
 
@@ -2128,6 +2218,24 @@
 
   function targetLabel(exercise, value) {
     return exercise.type === "time" ? value + " sec" : value + " reps";
+  }
+
+  function dayKeyFor(date) {
+    return [
+      date.getFullYear(),
+      String(date.getMonth() + 1).padStart(2, "0"),
+      String(date.getDate()).padStart(2, "0")
+    ].join("-");
+  }
+
+  function startOfDay(date) {
+    var copy = new Date(date);
+    copy.setHours(0, 0, 0, 0);
+    return copy;
+  }
+
+  function shortDayLabel(date) {
+    return ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][date.getDay()];
   }
 
   function secondsBetween(start, end) {
