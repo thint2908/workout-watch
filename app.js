@@ -1025,6 +1025,7 @@
         setEndsAt: null,
         restStartedAt: null,
         restEndsAt: null,
+        completedItemIds: [],
         completedSets: []
       };
 
@@ -1139,6 +1140,7 @@
       return;
     }
     workout.completedSets = Array.isArray(workout.completedSets) ? workout.completedSets : [];
+    workout.completedItemIds = Array.isArray(workout.completedItemIds) ? workout.completedItemIds : [];
     workout.exercises.forEach(function (item, index) {
       item.itemId = item.itemId || localItemId(item.id || "exercise");
       item.order = cleanNumber(item.order, index + 1);
@@ -1385,11 +1387,13 @@
 
   function finishExercise() {
     var workout = state.activeWorkout;
+    var plan = currentPlan();
     if (!workout) {
       return;
     }
 
     updateCurrentRestDuration();
+    markExerciseComplete(plan);
 
     if (prepareNextExercise()) {
       persistActiveWorkout();
@@ -1482,7 +1486,20 @@
   }
 
   function isExerciseComplete(plan) {
-    return completedSetCount(plan) >= plan.sets;
+    return isExerciseManuallyComplete(plan) || completedSetCount(plan) >= plan.sets;
+  }
+
+  function isExerciseManuallyComplete(plan) {
+    var workout = state.activeWorkout;
+    return Boolean(workout && plan && workout.completedItemIds.indexOf(plan.itemId) >= 0);
+  }
+
+  function markExerciseComplete(plan) {
+    var workout = state.activeWorkout;
+    if (!workout || !plan || completedSetCount(plan) >= plan.sets || isExerciseManuallyComplete(plan)) {
+      return;
+    }
+    workout.completedItemIds.push(plan.itemId);
   }
 
   function selectFirstIncompleteWorkoutItem(excludedItemId) {
@@ -1554,7 +1571,8 @@
     var items = sortedWorkoutItems();
     items.forEach(function (item, index) {
       var completed = completedSetCount(item);
-      var complete = completed >= item.sets;
+      var complete = isExerciseComplete(item);
+      var setSummary = (isExerciseManuallyComplete(item) ? "Done · " : "") + completed + " / " + item.sets + " sets";
       var current = currentPlan() && currentPlan().itemId === item.itemId;
       var row = document.createElement("div");
       row.className = "active-plan-row" + (current ? " current" : "");
@@ -1562,7 +1580,7 @@
         '<div class="active-plan-main">' +
         '<span class="order-badge">' + (index + 1) + "</span>" +
         "<div><strong>" + escapeHtml(item.name) + "</strong>" +
-        "<small>" + completed + " / " + item.sets + " sets · " + targetLabel(item, item.target) + " · " + item.restSeconds + "s rest</small></div>" +
+        "<small>" + setSummary + " · " + targetLabel(item, item.target) + " · " + item.restSeconds + "s rest</small></div>" +
         "</div>" +
         '<div class="row-actions active-plan-actions">' +
         '<button class="ghost-btn small-btn" type="button" data-action="up">Up</button>' +
@@ -1701,6 +1719,11 @@
       item.restSeconds = values.restSeconds;
       var completedAfterEdit = completedSetCount(item);
       var hasPendingSets = completedAfterEdit < item.sets;
+      if (hasPendingSets) {
+        workout.completedItemIds = workout.completedItemIds.filter(function (completedItemId) {
+          return completedItemId !== itemId;
+        });
+      }
       if (workout.currentItemId === itemId && workout.setNumber > item.sets) {
         workout.setNumber = Math.max(1, item.sets);
       }
